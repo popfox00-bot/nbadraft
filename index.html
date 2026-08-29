@@ -102,6 +102,8 @@
   .bball-season-banner-record{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size:28px; font-weight:800; color:var(--ink); }
   .bball-season-banner-seed{ font-size:12px; font-weight:700; color:var(--ink-soft); margin-top:4px; text-transform:uppercase; letter-spacing:0.04em; }
   .bball-season-banner-result{ font-size:14px; font-weight:700; color:var(--accent); margin-top:10px; line-height:1.5; }
+  .bball-awards-row{ display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-top:12px; }
+  .bball-award-badge{ background:var(--panel); color:var(--ink); font-size:11.5px; font-weight:700; padding:7px 11px; border-radius:20px; box-shadow: inset 0 0 0 1px var(--accent); }
   .bball-season-tabs{ display:flex; gap:6px; margin-bottom:14px; background:var(--panel); border-radius:12px; padding:4px; }
   .bball-season-tab{ flex:1; border:none; background:none; padding:9px 0; border-radius:9px; font-size:12px; font-weight:700; color:var(--ink-soft); cursor:pointer; }
   .bball-season-tab.active{ background:var(--accent); color:#fff; }
@@ -228,9 +230,11 @@
         <div class="bball-season-tabs" id="bballSeasonTabs">
           <button class="bball-season-tab active" data-tab="overview">Overview</button>
           <button class="bball-season-tab" data-tab="standings">Standings</button>
+          <button class="bball-season-tab" data-tab="playerstats">Player Stats</button>
         </div>
         <div id="bballSeasonOverview" class="bball-season-panel"></div>
         <div id="bballSeasonStandings" class="bball-season-panel" style="display:none;"></div>
+        <div id="bballSeasonPlayerStats" class="bball-season-panel" style="display:none;"></div>
         <button class="text-btn" id="bballSimPlayoffsBtn" style="background:var(--accent); color:#fff; box-shadow:none;">Simulate Playoffs</button>
       </div>
 
@@ -4313,8 +4317,10 @@
     var record = result.userRecord;
     document.getElementById("bballSeasonBanner").innerHTML =
       '<div class="bball-season-banner-record">' + record.wins + '-' + record.losses + '</div>'
-      + '<div class="bball-season-banner-seed">' + bballOrdinal(result.userSeed) + ' seed &middot; ' + result.userConf + ' Conference</div>'
-      + '<div class="bball-season-banner-result">' + (result.userSeed <= 10 ? "Made the playoffs — simulate the postseason below." : "Missed the playoffs this year.") + '</div>';
+      + '<div class="bball-season-banner-seed">' + bballOrdinal(result.userSeed) + ' seed &middot; ' + result.userConf + ' Conference'
+      + (result.overallRank === 1 ? ' &middot; #1 overall' : '') + '</div>'
+      + '<div class="bball-season-banner-result">' + (result.userSeed <= 10 ? "Made the playoffs — simulate the postseason below." : "Missed the playoffs this year.") + '</div>'
+      + bballAwardsBadgesHtml(result.awards);
 
     var div = bballDivisionOf(result.userTeam);
     var divTeams = LEAGUE_DIVISIONS[div].slice().sort(function(a,b){ return result.records[b].wins - result.records[a].wins; });
@@ -4327,12 +4333,15 @@
         + '<div class="bball-stand-record">' + result.records[t].wins + '-' + result.records[t].losses + '</div>'
         + '</div>';
     });
-    overviewHtml += '</div><p class="chess-status">Ratings blend real per-game stats into a single power number; every game (and every best-of-7 series) is decided by that gap, with a home-court edge and always a little room for an upset.</p>';
+    overviewHtml += '</div><p class="chess-status">Ratings blend real per-game stats into a single power number; every game (and every best-of-7 series) is decided by that gap, with a home-court edge and always a little room for an upset. DPOY isn\'t awarded yet — this player data doesn\'t track steals or blocks.</p>';
     document.getElementById("bballSeasonOverview").innerHTML = overviewHtml;
 
     document.getElementById("bballSeasonStandings").innerHTML =
       '<div class="bball-stand-group"><div class="bball-stand-title">Eastern Conference</div>' + bballStandingsRowsHtml(result.eastStandings, result) + '</div>'
       + '<div class="bball-stand-group"><div class="bball-stand-title">Western Conference</div>' + bballStandingsRowsHtml(result.westStandings, result) + '</div>';
+
+    document.getElementById("bballSeasonPlayerStats").innerHTML =
+      '<div class="bball-stand-group"><div class="bball-stand-title">Simulated Season Averages</div>' + bballPlayerStatRowsHtml(result.playerLines) + '</div>';
   }
 
   // ---- Playoff stepper ----
@@ -4367,9 +4376,16 @@
       return confSection("Eastern Conference Finals", null, playoffs.eastBracket, "cf")
         + confSection("Western Conference Finals", null, playoffs.westBracket, "cf");
     } else {
-      return '<div class="bball-po-round"><div class="bball-po-round-title">NBA Finals</div>'
+      var finalsHtml = '<div class="bball-po-round"><div class="bball-po-round-title">NBA Finals</div>'
         + bballSeriesRowHtml(playoffs.finals, season.userTeam) + '</div>'
         + '<p class="chess-status" style="margin-top:14px;">' + playoffs.userResult + '</p>';
+      if (playoffs.awards && playoffs.awards.length){
+        finalsHtml += bballAwardsBadgesHtml(playoffs.awards);
+      }
+      if (playoffs.playerLines && playoffs.playerLines.length){
+        finalsHtml += '<div class="bball-stand-group" style="margin-top:14px;"><div class="bball-stand-title">Simulated Playoff Averages</div>' + bballPlayerStatRowsHtml(playoffs.playerLines) + '</div>';
+      }
+      return finalsHtml;
     }
   }
 
@@ -4389,6 +4405,87 @@
   }
 
   // ---- Loading-bar sequencing ----
+  // ---- Simulated individual player statistics & awards ----
+  // Gives each drafted player a "simulated" per-game line for this season/postseason by
+  // applying random variance (+/-12%) around their real historical averages, so results
+  // feel fresh across re-simulations rather than always echoing the exact draft-day stats.
+  function bballVaryStat(v){
+    var factor = 0.88 + Math.random() * 0.24;
+    return Math.max(0, v * factor);
+  }
+  function bballSimulatePlayerStatLines(){
+    var lines = [];
+    BBALL_POSITIONS.forEach(function(pos){
+      var slot = bball.slots[pos];
+      if (!slot) return;
+      var real = bballStatsFor(slot.player.name, slot.team, slot.era);
+      if (!real) return;
+      var ppg = bballVaryStat(real.ppg), rpg = bballVaryStat(real.rpg), apg = bballVaryStat(real.apg);
+      lines.push({ pos: pos, name: slot.player.name, team: slot.team, era: slot.era, ppg: ppg, rpg: rpg, apg: apg, combined: ppg + rpg + apg });
+    });
+    return lines;
+  }
+  function bballBestPlayerLine(lines){
+    if (!lines.length) return null;
+    var best = lines[0];
+    lines.forEach(function(l){ if (l.combined > best.combined) best = l; });
+    return best;
+  }
+  function bballPlayerStatRowsHtml(lines){
+    if (!lines.length) return '<p class="chess-status">No stat lines available.</p>';
+    var html = "";
+    lines.forEach(function(l){
+      html += '<div class="bball-stand-row"><div class="bball-stand-name">' + l.name + ' <span class="bball-stand-era">(' + l.pos + ')</span></div>'
+        + '<div class="bball-stand-record">' + l.ppg.toFixed(1) + '/' + l.rpg.toFixed(1) + '/' + l.apg.toFixed(1) + '</div></div>';
+    });
+    return html;
+  }
+
+  // Regular-season awards: MVP goes to whichever of your five players simulates the best
+  // combined line; Coach of the Year is awarded only if your team finishes as the #1
+  // overall seed in the full 30-team league (not just your conference). DPOY isn't awarded
+  // yet — this player data set doesn't track steals or blocks, so there's no fair way to
+  // judge defense until that's added.
+  function bballComputeRegularSeasonAwards(season){
+    var lines = bballSimulatePlayerStatLines();
+    var mvp = bballBestPlayerLine(lines);
+    var allSorted = BBALL_TEAMS.slice().sort(function(a,b){
+      var wa = season.records[a].wins, wb = season.records[b].wins;
+      if (wb !== wa) return wb - wa;
+      return season.league[b].rating - season.league[a].rating;
+    });
+    var overallRank = allSorted.indexOf(season.userTeam) + 1;
+    var awards = [];
+    if (mvp) awards.push({ award:"MVP", player:mvp.name, detail: bballPlayerLineLabel(mvp) });
+    if (overallRank === 1) awards.push({ award:"Coach of the Year", player:null, detail:"Best record in the league at " + season.userRecord.wins + "-" + season.userRecord.losses });
+    return { lines: lines, mvp: mvp, overallRank: overallRank, awards: awards };
+  }
+
+  // Finals MVP only gets awarded when your team actually wins the title — we don't
+  // simulate opposing rosters at the player level, so there's no fair way to award it
+  // to the other side.
+  function bballComputePlayoffAwards(season, playoffs){
+    if (season.userSeed > 10) return { lines: [], finalsMVP: null, awards: [] };
+    var lines = bballSimulatePlayerStatLines();
+    var awards = [], finalsMVP = null;
+    if (playoffs.finals.winner === season.userTeam){
+      finalsMVP = bballBestPlayerLine(lines);
+      if (finalsMVP) awards.push({ award:"Finals MVP", player:finalsMVP.name, detail: bballPlayerLineLabel(finalsMVP) });
+    }
+    return { lines: lines, finalsMVP: finalsMVP, awards: awards };
+  }
+
+  var bballCurrentSeasonAwards = [];
+
+  function bballAwardsBadgesHtml(awards){
+    if (!awards.length) return "";
+    var html = '<div class="bball-awards-row">';
+    awards.forEach(function(a){
+      html += '<div class="bball-award-badge">🏆 ' + a.award + (a.player ? (' — ' + a.player) : '') + '</div>';
+    });
+    return html + '</div>';
+  }
+
   function bballRunProgressBar(fillId, durationMs, onDone){
     var fill = document.getElementById(fillId);
     fill.style.transition = "none";
@@ -4405,16 +4502,29 @@
     document.getElementById("bballPlayoffLoading").style.display = "none";
     document.getElementById("bballPlayoffResults").style.display = "none";
     document.getElementById("bballSeasonLoading").style.display = "block";
+    bballCurrentSeasonAwards = [];
     bballRunProgressBar("bballSeasonProgressFill", 2200, function(){
       bballLastSeasonResult = bballSimulateRegularSeasonPhase();
       bballLastPlayoffResult = null;
       bballUpdateSeasonStats(bballLastSeasonResult.userRecord.wins, bballLastSeasonResult.userRecord.losses);
+
+      var regAwards = bballComputeRegularSeasonAwards(bballLastSeasonResult);
+      bballLastSeasonResult.playerLines = regAwards.lines;
+      bballLastSeasonResult.mvp = regAwards.mvp;
+      bballLastSeasonResult.overallRank = regAwards.overallRank;
+      bballLastSeasonResult.awards = regAwards.awards;
+      bballCurrentSeasonAwards = regAwards.awards.slice();
+      bballUpdateBestPlayerSeason(regAwards.lines);
+      bballAddAwardsTally(regAwards.awards.length);
+      bballUpdateBestAwardsSeason(bballCurrentSeasonAwards);
+
       bballRenderRegularSeasonResults(bballLastSeasonResult);
       document.getElementById("bballSeasonLoading").style.display = "none";
       document.getElementById("bballSeasonResults").style.display = "block";
       document.querySelectorAll(".bball-season-tab").forEach(function(tab, i){ tab.classList.toggle("active", i === 0); });
       document.getElementById("bballSeasonOverview").style.display = "block";
       document.getElementById("bballSeasonStandings").style.display = "none";
+      document.getElementById("bballSeasonPlayerStats").style.display = "none";
     });
   }
 
@@ -4424,6 +4534,16 @@
     bballRunProgressBar("bballPlayoffProgressFill", 2200, function(){
       bballLastPlayoffResult = bballSimulatePlayoffsPhase(bballLastSeasonResult);
       bballUpdatePlayoffStats(bballLastPlayoffResult.userRank);
+
+      var poAwards = bballComputePlayoffAwards(bballLastSeasonResult, bballLastPlayoffResult);
+      bballLastPlayoffResult.playerLines = poAwards.lines;
+      bballLastPlayoffResult.finalsMVP = poAwards.finalsMVP;
+      bballLastPlayoffResult.awards = poAwards.awards;
+      bballCurrentSeasonAwards = bballCurrentSeasonAwards.concat(poAwards.awards);
+      if (poAwards.lines.length) bballUpdateBestPlayoffPlayerSeason(poAwards.lines);
+      bballAddAwardsTally(poAwards.awards.length);
+      bballUpdateBestAwardsSeason(bballCurrentSeasonAwards);
+
       bballPlayoffStepIdx = 0;
       bballRenderPlayoffStep();
       document.getElementById("bballPlayoffLoading").style.display = "none";
@@ -4439,7 +4559,12 @@
 
   // ---- Career stats persistence ----
   var BSTATS_KEY = "basketballDraftCareerStats";
-  var bstats = { bestGradeIdx:null, bestGradeText:null, bestPRA:null, bestSeasonWins:null, bestSeasonRecord:null, bestPlayoffRank:null, bestPlayoffText:null };
+  var bstats = {
+    bestGradeIdx:null, bestGradeText:null, bestPRA:null, bestSeasonWins:null, bestSeasonRecord:null, bestPlayoffRank:null, bestPlayoffText:null,
+    bestPlayerSeasonScore:null, bestPlayerSeasonText:null,
+    bestPlayoffPlayerScore:null, bestPlayoffPlayerText:null,
+    totalAwardsWon:0, bestAwardsSeasonCount:null, bestAwardsSeasonText:null
+  };
   var PLAYOFF_RANK_LABELS = [
     "Missed the Playoffs", "Eliminated in the Play-In", "Lost in the First Round",
     "Lost in the Conference Semifinals", "Lost in the Conference Finals",
@@ -4481,6 +4606,40 @@
       bballSaveStats();
     }
   }
+  function bballPlayerLineLabel(line){
+    return line.name + " — " + line.ppg.toFixed(1) + "/" + line.rpg.toFixed(1) + "/" + line.apg.toFixed(1);
+  }
+  function bballUpdateBestPlayerSeason(lines){
+    var best = bballBestPlayerLine(lines);
+    if (!best) return;
+    if (bstats.bestPlayerSeasonScore === null || best.combined > bstats.bestPlayerSeasonScore){
+      bstats.bestPlayerSeasonScore = best.combined;
+      bstats.bestPlayerSeasonText = bballPlayerLineLabel(best);
+      bballSaveStats();
+    }
+  }
+  function bballUpdateBestPlayoffPlayerSeason(lines){
+    var best = bballBestPlayerLine(lines);
+    if (!best) return;
+    if (bstats.bestPlayoffPlayerScore === null || best.combined > bstats.bestPlayoffPlayerScore){
+      bstats.bestPlayoffPlayerScore = best.combined;
+      bstats.bestPlayoffPlayerText = bballPlayerLineLabel(best);
+      bballSaveStats();
+    }
+  }
+  function bballAddAwardsTally(newAwardsCount){
+    if (!newAwardsCount) return;
+    bstats.totalAwardsWon = (bstats.totalAwardsWon || 0) + newAwardsCount;
+    bballSaveStats();
+  }
+  function bballUpdateBestAwardsSeason(seasonAwards){
+    var count = seasonAwards.length;
+    if (count > 0 && (bstats.bestAwardsSeasonCount === null || count > bstats.bestAwardsSeasonCount)){
+      bstats.bestAwardsSeasonCount = count;
+      bstats.bestAwardsSeasonText = seasonAwards.map(function(a){ return a.award + (a.player ? (" (" + a.player + ")") : ""); }).join(", ");
+      bballSaveStats();
+    }
+  }
   function bballRenderStats(){
     function card(label, value, sub){
       return '<div class="bball-stat-card"><div class="bball-stat-card-label">' + label + '</div>'
@@ -4492,6 +4651,10 @@
     html += card("Best Overall P+R+A", bstats.bestPRA !== null ? bstats.bestPRA.toFixed(1) : "—", "Combined PPG+RPG+APG average across your five, ×5.");
     html += card("Best Season Sim", bstats.bestSeasonRecord || "—", "Best regular-season record across all simulated seasons.");
     html += card("Best Playoff Result", bstats.bestPlayoffText || "—", "Furthest run through the postseason you've achieved.");
+    html += card("Best Individual Season", bstats.bestPlayerSeasonText || "—", "Best simulated regular-season line from any of your drafted players.");
+    html += card("Best Individual Playoff Run", bstats.bestPlayoffPlayerText || "—", "Best simulated playoff line from any of your drafted players.");
+    html += card("Total Awards Won", bstats.totalAwardsWon || 0, "Lifetime tally of MVP, Coach of the Year, and Finals MVP awards.");
+    html += card("Best Awards Season", bstats.bestAwardsSeasonCount !== null ? (bstats.bestAwardsSeasonCount + " award" + (bstats.bestAwardsSeasonCount===1?"":"s")) : "—", bstats.bestAwardsSeasonText || "No awards won yet.");
     document.getElementById("bballStatsBody").innerHTML = html;
   }
 
@@ -4512,6 +4675,7 @@
       var target = tab.dataset.tab;
       document.getElementById("bballSeasonOverview").style.display = target === "overview" ? "block" : "none";
       document.getElementById("bballSeasonStandings").style.display = target === "standings" ? "block" : "none";
+      document.getElementById("bballSeasonPlayerStats").style.display = target === "playerstats" ? "block" : "none";
     });
   });
 
