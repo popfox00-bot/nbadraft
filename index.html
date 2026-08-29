@@ -122,6 +122,34 @@
   .bball-po-series-winner{ font-weight:800; color:var(--ink); }
   .bball-po-series-loser{ color:var(--ink-soft); }
   .bball-po-series-score{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-weight:700; color:var(--ink-soft); white-space:nowrap; }
+
+  /* ---- Favorite team picker ---- */
+  .bball-team-select{
+    width:100%; padding:14px; border-radius:12px; border:none; margin-top:14px;
+    background:var(--panel); color:var(--ink); font-size:15px; font-weight:700;
+    box-shadow: inset 0 0 0 1px var(--rule); appearance:none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238B93A7' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 14px center;
+  }
+
+  /* ---- Loading bars ---- */
+  .bball-progress-track{ height:10px; border-radius:6px; background:var(--panel); box-shadow: inset 0 0 0 1px var(--rule); overflow:hidden; margin-top:18px; }
+  .bball-progress-fill{ height:100%; width:0%; border-radius:6px; background:var(--accent); transition:width 2.2s cubic-bezier(.2,.6,.3,1); }
+
+  /* ---- Playoff stepper ---- */
+  .bball-po-stepper-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .bball-po-step-label{ font-size:15px; font-weight:800; color:var(--ink); text-align:center; flex:1; }
+  .bball-po-dots{ display:flex; justify-content:center; gap:6px; margin-top:16px; }
+  .bball-po-dot{ width:7px; height:7px; border-radius:50%; background:var(--panel-hi); box-shadow: inset 0 0 0 1px var(--rule); }
+  .bball-po-dot.active{ background:var(--accent); }
+
+  /* ---- Stats overlay ---- */
+  .bball-stats-overlay{ position:fixed; inset:0; background:var(--bg); z-index:50; overflow-y:auto; padding:26px 20px 60px; }
+  .bball-stats-overlay .top-bar{ max-width:420px; margin:0 auto 18px; }
+  .bball-stat-card{ max-width:420px; margin:0 auto 12px; background:var(--panel); border-radius:16px; padding:18px 16px; box-shadow: inset 0 0 0 1px var(--rule); }
+  .bball-stat-card-label{ font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.06em; font-weight:700; }
+  .bball-stat-card-value{ font-size:22px; font-weight:800; color:var(--accent); margin-top:6px; }
+  .bball-stat-card-sub{ font-size:12.5px; color:var(--ink-soft); margin-top:4px; line-height:1.5; }
 </style>
 </head>
 <body>
@@ -132,12 +160,23 @@
         <p class="eyebrow">Random Roster Draft</p>
         <h1>🏀 Basketball Draft</h1>
       </div>
-      <button class="icon-btn" id="themeToggleBtn" aria-label="Toggle theme">
-        <svg id="themeIcon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
-      </button>
+      <div style="display:flex; gap:8px;">
+        <button class="icon-btn" id="bballStatsBtn" aria-label="Statistics">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M12 20V4M20 20v-7"></path></svg>
+        </button>
+        <button class="icon-btn" id="themeToggleBtn" aria-label="Toggle theme">
+          <svg id="themeIcon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+        </button>
+      </div>
     </div>
 
-    <div id="bballSetup">
+    <div id="bballFavoriteSetup">
+      <p class="chess-status">Select your favorite team — you'll represent them in the season simulation, no matter which historical roster you draft from.</p>
+      <select id="bballFavoriteTeamSelect" class="bball-team-select"></select>
+      <button class="text-btn" id="bballConfirmFavoriteBtn" style="background:var(--accent); color:#fff; box-shadow:none;">Confirm Team</button>
+    </div>
+
+    <div id="bballSetup" style="display:none;">
       <div class="bball-pick-row">
         <div class="bball-pick-card">
           <div class="bball-pick-label">Era</div>
@@ -179,17 +218,40 @@
     </div>
 
     <div id="bballSeason" style="display:none;">
-      <div class="bball-season-banner" id="bballSeasonBanner"></div>
-
-      <div class="bball-season-tabs" id="bballSeasonTabs">
-        <button class="bball-season-tab active" data-tab="overview">Overview</button>
-        <button class="bball-season-tab" data-tab="standings">Standings</button>
-        <button class="bball-season-tab" data-tab="playoffs">Playoffs</button>
+      <div id="bballSeasonLoading" style="display:none;">
+        <p class="chess-status">Simulating the 82-game season…</p>
+        <div class="bball-progress-track"><div class="bball-progress-fill" id="bballSeasonProgressFill"></div></div>
       </div>
 
-      <div id="bballSeasonOverview" class="bball-season-panel"></div>
-      <div id="bballSeasonStandings" class="bball-season-panel" style="display:none;"></div>
-      <div id="bballSeasonPlayoffs" class="bball-season-panel" style="display:none;"></div>
+      <div id="bballSeasonResults" style="display:none;">
+        <div class="bball-season-banner" id="bballSeasonBanner"></div>
+        <div class="bball-season-tabs" id="bballSeasonTabs">
+          <button class="bball-season-tab active" data-tab="overview">Overview</button>
+          <button class="bball-season-tab" data-tab="standings">Standings</button>
+        </div>
+        <div id="bballSeasonOverview" class="bball-season-panel"></div>
+        <div id="bballSeasonStandings" class="bball-season-panel" style="display:none;"></div>
+        <button class="text-btn" id="bballSimPlayoffsBtn" style="background:var(--accent); color:#fff; box-shadow:none;">Simulate Playoffs</button>
+      </div>
+
+      <div id="bballPlayoffLoading" style="display:none;">
+        <p class="chess-status">Simulating the postseason…</p>
+        <div class="bball-progress-track"><div class="bball-progress-fill" id="bballPlayoffProgressFill"></div></div>
+      </div>
+
+      <div id="bballPlayoffResults" style="display:none;">
+        <div class="bball-po-stepper-header">
+          <button class="icon-btn" id="bballPlayoffPrevBtn" aria-label="Previous round">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+          </button>
+          <div class="bball-po-step-label" id="bballPlayoffStepLabel">Play-In</div>
+          <button class="icon-btn" id="bballPlayoffNextBtn" aria-label="Next round">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>
+          </button>
+        </div>
+        <div id="bballPlayoffStepContent"></div>
+        <div class="bball-po-dots" id="bballPlayoffDots"></div>
+      </div>
 
       <div class="sol-action-row">
         <button class="text-btn" id="bballSeasonReplayBtn" style="margin-top:0;">Re-Simulate</button>
@@ -197,6 +259,19 @@
       </div>
     </div>
   </div>
+</div>
+
+<div id="bballStatsPage" class="bball-stats-overlay" style="display:none;">
+  <div class="top-bar">
+    <div>
+      <p class="eyebrow">Career Stats</p>
+      <h1>📊 Statistics</h1>
+    </div>
+    <button class="icon-btn" id="bballStatsCloseBtn" aria-label="Close">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+    </button>
+  </div>
+  <div id="bballStatsBody"></div>
 </div>
 
 <script>
@@ -3537,8 +3612,8 @@
   // with each other; Centers can also cover PF (but not SF), one-directionally.
   var BBALL_SLOT_ELIGIBLE = {
     PG: ["PG","SG"],
-    SG: ["PG","SG"],
-    SF: ["SF","PF"],
+    SG: ["PG","SG","SF"],
+    SF: ["SG","SF","PF"],
     PF: ["SF","PF","C"],
     C:  ["C"]
   };
@@ -3572,12 +3647,14 @@
   ];
 
   var bball = {
-    era: null, team: null,
+    era: null, team: null, favoriteTeam: null,
     roster: [], pool: [],
     slots: { PG:null, SG:null, SF:null, PF:null, C:null },
     candidate: null,
     respinsSinceLastPick: 0
   };
+
+  var FAVORITE_TEAM_KEY = "basketballDraftFavoriteTeam";
 
   function openBballDraft(){
     bball.era = null;
@@ -3593,9 +3670,25 @@
     document.getElementById("bballSetupMsg").textContent = "Spin both to begin.";
     document.getElementById("bballBeginBtn").disabled = true;
 
-    document.getElementById("bballSetup").style.display = "block";
+    var savedFavorite = null;
+    try{ savedFavorite = localStorage.getItem(FAVORITE_TEAM_KEY); }catch(e){}
+    if (savedFavorite && BBALL_TEAMS.indexOf(savedFavorite) !== -1){
+      document.getElementById("bballFavoriteTeamSelect").value = savedFavorite;
+    }
+
+    document.getElementById("bballFavoriteSetup").style.display = "block";
+    document.getElementById("bballSetup").style.display = "none";
     document.getElementById("bballDraft").style.display = "none";
     document.getElementById("bballComplete").style.display = "none";
+    document.getElementById("bballSeason").style.display = "none";
+  }
+
+  function bballConfirmFavoriteTeam(){
+    var select = document.getElementById("bballFavoriteTeamSelect");
+    bball.favoriteTeam = select.value;
+    try{ localStorage.setItem(FAVORITE_TEAM_KEY, bball.favoriteTeam); }catch(e){}
+    document.getElementById("bballFavoriteSetup").style.display = "none";
+    document.getElementById("bballSetup").style.display = "block";
   }
 
   function bballSpinEra(){
@@ -3908,6 +4001,7 @@
       '<div class="bball-grade-letter">' + grade.grade + '</div>'
       + '<div class="bball-grade-label">' + grade.label + '</div>'
       + '<div class="bball-grade-detail">' + grade.blurb + '</div>';
+    bballUpdateGradeStats(grade);
   }
 
   // ================= SEASON SIMULATOR =================
@@ -3957,13 +4051,13 @@
     return { era: era, players: picks, rating: ratingFromStatLines(lines) || 100 };
   }
 
-  // Builds all 30 teams for this season: the user's drafted five, plus one randomly-
-  // rostered "opponent" for each of the other 29 real franchises.
+  // Builds all 30 teams for this season: the user's favorite team (rated using the drafted
+  // five), plus one randomly-rostered "opponent" for each of the other 29 real franchises.
   function bballBuildLeague(){
     var league = {};
-    league[bball.team] = { name: bball.team, era: "Your Draft", rating: bballUserRating() || 100, isUser: true };
+    league[bball.favoriteTeam] = { name: bball.favoriteTeam, era: "Your Draft", rating: bballUserRating() || 100, isUser: true };
     BBALL_TEAMS.forEach(function(team){
-      if (team === bball.team) return;
+      if (team === bball.favoriteTeam) return;
       var r = bballRandomRosterFor(team);
       league[team] = { name: team, era: r ? r.era : "—", rating: r ? r.rating : 100, isUser: false };
     });
@@ -4096,11 +4190,16 @@
     return n + (s[(v-20)%10] || s[v] || s[0]);
   }
 
-  function bballSimulateFullSeason(){
+  function bballOrdinal(n){
+    var s = ["th","st","nd","rd"], v = n % 100;
+    return n + (s[(v-20)%10] || s[v] || s[0]);
+  }
+
+  // ---- Phase 1: regular season only ----
+  function bballSimulateRegularSeasonPhase(){
     var league = bballBuildLeague();
     var records = bballSimulateRegularSeason(league);
 
-    // Build sorted conference standings (wins desc, then rating as tiebreak).
     function standingsFor(conf){
       return BBALL_TEAMS.filter(function(t){ return bballConferenceOf(t) === conf; })
         .sort(function(a,b){
@@ -4111,55 +4210,63 @@
     }
     var eastStandings = standingsFor("Eastern");
     var westStandings = standingsFor("Western");
-
-    var userConf = bballConferenceOf(bball.team);
+    var userConf = bballConferenceOf(bball.favoriteTeam);
     var userStandings = userConf === "Eastern" ? eastStandings : westStandings;
-    var userSeed = userStandings.indexOf(bball.team) + 1;
+    var userSeed = userStandings.indexOf(bball.favoriteTeam) + 1;
 
-    var eastPlayIn = bballSimPlayIn(eastStandings, league);
-    var westPlayIn = bballSimPlayIn(westStandings, league);
+    return {
+      league: league, records: records,
+      eastStandings: eastStandings, westStandings: westStandings,
+      userTeam: bball.favoriteTeam, userConf: userConf, userSeed: userSeed,
+      userRecord: records[bball.favoriteTeam]
+    };
+  }
 
-    var eastSeeds = eastStandings.slice(0,6).concat([eastPlayIn.seed7, eastPlayIn.seed8]);
-    var westSeeds = westStandings.slice(0,6).concat([westPlayIn.seed7, westPlayIn.seed8]);
-
+  // ---- Phase 2: postseason, given an existing regular-season result ----
+  // userRank scale: 0=missed playoffs, 1=play-in exit, 2=lost R1, 3=lost semis,
+  // 4=lost conf finals, 5=lost NBA Finals, 6=NBA Champion.
+  function bballSimulatePlayoffsPhase(base){
+    var league = base.league, records = base.records;
+    var eastPlayIn = bballSimPlayIn(base.eastStandings, league);
+    var westPlayIn = bballSimPlayIn(base.westStandings, league);
+    var eastSeeds = base.eastStandings.slice(0,6).concat([eastPlayIn.seed7, eastPlayIn.seed8]);
+    var westSeeds = base.westStandings.slice(0,6).concat([westPlayIn.seed7, westPlayIn.seed8]);
     var eastBracket = bballRunConferenceBracket(eastSeeds, league);
     var westBracket = bballRunConferenceBracket(westSeeds, league);
-
     var finals = bballSimSeriesAuto(eastBracket.champion, westBracket.champion, league);
 
-    // Work out exactly how far the user's team went, in plain language.
-    var userResult = "";
-    var madePlayIn = userSeed >= 7 && userSeed <= 10;
-    var madePlayoffsDirect = userSeed <= 6;
+    var userTeam = base.userTeam, userSeed = base.userSeed, userConf = base.userConf;
     var userConfSeeds = userConf === "Eastern" ? eastSeeds : westSeeds;
-    var userInPlayoffs = userConfSeeds.indexOf(bball.team) !== -1;
     var userBracket = userConf === "Eastern" ? eastBracket : westBracket;
+    var userInPlayoffs = userConfSeeds.indexOf(userTeam) !== -1;
+    var madePlayIn = userSeed >= 7 && userSeed <= 10;
 
+    var userResult = "", userRank = 0;
     if (userSeed > 10){
       userResult = "Missed the playoffs, finishing " + bballOrdinal(userSeed) + " in the " + userConf + " Conference.";
+      userRank = 0;
     } else if (madePlayIn && !userInPlayoffs){
       userResult = "Eliminated in the Play-In Tournament as the " + bballOrdinal(userSeed) + " seed.";
+      userRank = 1;
     } else {
-      // Figure out furthest round reached.
-      var reached = "Round 1";
-      var eliminatedBy = null, wonFinals = false;
-      var r1match = userBracket.round1.filter(function(s){ return s.winner === bball.team || s.loser === bball.team; })[0];
-      if (r1match && r1match.loser === bball.team){
-        reached = "lost in the First Round";
+      var reached = "Round 1", eliminatedBy = null, wonFinals = false;
+      var r1match = userBracket.round1.filter(function(s){ return s.winner === userTeam || s.loser === userTeam; })[0];
+      if (r1match && r1match.loser === userTeam){
+        reached = "lost in the First Round"; userRank = 2;
         eliminatedBy = r1match.winner + " (" + r1match.scoreHigh + "-" + r1match.scoreLow + ")";
       } else {
-        var r2match = userBracket.round2.filter(function(s){ return s.winner === bball.team || s.loser === bball.team; })[0];
-        if (r2match && r2match.loser === bball.team){
-          reached = "lost in the Conference Semifinals";
+        var r2match = userBracket.round2.filter(function(s){ return s.winner === userTeam || s.loser === userTeam; })[0];
+        if (r2match && r2match.loser === userTeam){
+          reached = "lost in the Conference Semifinals"; userRank = 3;
           eliminatedBy = r2match.winner + " (" + r2match.scoreHigh + "-" + r2match.scoreLow + ")";
-        } else if (userBracket.confFinal.loser === bball.team){
-          reached = "lost in the Conference Finals";
+        } else if (userBracket.confFinal.loser === userTeam){
+          reached = "lost in the Conference Finals"; userRank = 4;
           eliminatedBy = userBracket.confFinal.winner + " (" + userBracket.confFinal.scoreHigh + "-" + userBracket.confFinal.scoreLow + ")";
-        } else if (finals.loser === bball.team){
-          reached = "lost the NBA Finals";
+        } else if (finals.loser === userTeam){
+          reached = "lost the NBA Finals"; userRank = 5;
           eliminatedBy = finals.winner + " (" + finals.scoreHigh + "-" + finals.scoreLow + ")";
-        } else if (finals.winner === bball.team){
-          wonFinals = true;
+        } else if (finals.winner === userTeam){
+          wonFinals = true; userRank = 6;
         }
       }
       if (wonFinals){
@@ -4170,17 +4277,14 @@
     }
 
     return {
-      league: league, records: records,
-      eastStandings: eastStandings, westStandings: westStandings,
       eastPlayIn: eastPlayIn, westPlayIn: westPlayIn,
       eastBracket: eastBracket, westBracket: westBracket,
-      finals: finals,
-      userTeam: bball.team, userConf: userConf, userSeed: userSeed,
-      userRecord: records[bball.team], userResult: userResult
+      finals: finals, userResult: userResult, userRank: userRank
     };
   }
 
-  var bballLastSeasonResult = null;
+  var bballLastSeasonResult = null; // regular-season phase result
+  var bballLastPlayoffResult = null; // postseason phase result (once run)
 
   function bballSeriesRowHtml(series, userTeam){
     var isUserSeries = series.winner === userTeam || series.loser === userTeam;
@@ -4198,21 +4302,20 @@
       var cutline = (seed === 6 || seed === 10) ? " cutline" : "";
       html += '<div class="bball-stand-row' + (isUser ? ' user' : '') + cutline + '">'
         + '<div class="bball-stand-seed">' + seed + '</div>'
-        + '<div class="bball-stand-name">' + t + ' <span class="bball-stand-era">(' + result.league[t].era + ')</span></div>'
+        + '<div class="bball-stand-name">' + t + '</div>'
         + '<div class="bball-stand-record">' + result.records[t].wins + '-' + result.records[t].losses + '</div>'
         + '</div>';
     });
     return html;
   }
 
-  function bballRenderSeasonResults(result){
+  function bballRenderRegularSeasonResults(result){
     var record = result.userRecord;
     document.getElementById("bballSeasonBanner").innerHTML =
       '<div class="bball-season-banner-record">' + record.wins + '-' + record.losses + '</div>'
       + '<div class="bball-season-banner-seed">' + bballOrdinal(result.userSeed) + ' seed &middot; ' + result.userConf + ' Conference</div>'
-      + '<div class="bball-season-banner-result">' + result.userResult + '</div>';
+      + '<div class="bball-season-banner-result">' + (result.userSeed <= 10 ? "Made the playoffs — simulate the postseason below." : "Missed the playoffs this year.") + '</div>';
 
-    // Overview: division standing for quick context.
     var div = bballDivisionOf(result.userTeam);
     var divTeams = LEAGUE_DIVISIONS[div].slice().sort(function(a,b){ return result.records[b].wins - result.records[a].wins; });
     var overviewHtml = '<div class="bball-stand-group"><div class="bball-stand-title">' + div + ' Division</div>';
@@ -4220,57 +4323,188 @@
       var isUser = t === result.userTeam;
       overviewHtml += '<div class="bball-stand-row' + (isUser ? ' user' : '') + '">'
         + '<div class="bball-stand-seed">' + (i+1) + '</div>'
-        + '<div class="bball-stand-name">' + t + (isUser ? '' : (' <span class="bball-stand-era">(' + result.league[t].era + ')</span>')) + '</div>'
+        + '<div class="bball-stand-name">' + t + '</div>'
         + '<div class="bball-stand-record">' + result.records[t].wins + '-' + result.records[t].losses + '</div>'
         + '</div>';
     });
     overviewHtml += '</div><p class="chess-status">Ratings blend real per-game stats into a single power number; every game (and every best-of-7 series) is decided by that gap, with a home-court edge and always a little room for an upset.</p>';
     document.getElementById("bballSeasonOverview").innerHTML = overviewHtml;
 
-    // Full conference standings.
     document.getElementById("bballSeasonStandings").innerHTML =
       '<div class="bball-stand-group"><div class="bball-stand-title">Eastern Conference</div>' + bballStandingsRowsHtml(result.eastStandings, result) + '</div>'
       + '<div class="bball-stand-group"><div class="bball-stand-title">Western Conference</div>' + bballStandingsRowsHtml(result.westStandings, result) + '</div>';
+  }
 
-    // Full postseason bracket, both conferences.
-    function confSection(label, playIn, bracket){
-      var html = '<div class="bball-po-round"><div class="bball-po-round-title">' + label + ' Play-In</div>';
-      playIn.log.forEach(function(line){
-        var isUserLine = line.indexOf(result.userTeam) !== -1;
-        html += '<div class="bball-po-series' + (isUserLine ? ' user' : '') + '"><div>' + line + '</div></div>';
-      });
-      html += '</div>';
-      html += '<div class="bball-po-round"><div class="bball-po-round-title">' + label + ' First Round</div>';
-      bracket.round1.forEach(function(s){ html += bballSeriesRowHtml(s, result.userTeam); });
-      html += '</div>';
-      html += '<div class="bball-po-round"><div class="bball-po-round-title">' + label + ' Semifinals</div>';
-      bracket.round2.forEach(function(s){ html += bballSeriesRowHtml(s, result.userTeam); });
-      html += '</div>';
-      html += '<div class="bball-po-round"><div class="bball-po-round-title">' + label + ' Finals</div>';
-      html += bballSeriesRowHtml(bracket.confFinal, result.userTeam);
-      html += '</div>';
-      return html;
+  // ---- Playoff stepper ----
+  var bballPlayoffSteps = ["Play-In","First Round","Semifinals","Conference Finals","NBA Finals"];
+  var bballPlayoffStepIdx = 0;
+
+  function bballPlayoffStepHtml(stepIdx, season, playoffs){
+    function confSection(label, playIn, bracket, part){
+      if (part === "playin"){
+        var html = '<div class="bball-po-round"><div class="bball-po-round-title">' + label + '</div>';
+        playIn.log.forEach(function(line){
+          var isUserLine = line.indexOf(season.userTeam) !== -1;
+          html += '<div class="bball-po-series' + (isUserLine ? ' user' : '') + '"><div>' + line + '</div></div>';
+        });
+        return html + '</div>';
+      }
+      var seriesArr = part === "r1" ? bracket.round1 : part === "r2" ? bracket.round2 : [bracket.confFinal];
+      var html2 = '<div class="bball-po-round"><div class="bball-po-round-title">' + label + '</div>';
+      seriesArr.forEach(function(s){ html2 += bballSeriesRowHtml(s, season.userTeam); });
+      return html2 + '</div>';
     }
-    document.getElementById("bballSeasonPlayoffs").innerHTML =
-      confSection("Eastern Conference", result.eastPlayIn, result.eastBracket)
-      + confSection("Western Conference", result.westPlayIn, result.westBracket)
-      + '<div class="bball-po-round"><div class="bball-po-round-title">NBA Finals</div>' + bballSeriesRowHtml(result.finals, result.userTeam) + '</div>';
+    if (stepIdx === 0){
+      return confSection("Eastern Conference Play-In", playoffs.eastPlayIn, null, "playin")
+        + confSection("Western Conference Play-In", playoffs.westPlayIn, null, "playin");
+    } else if (stepIdx === 1){
+      return confSection("Eastern Conference — First Round", null, playoffs.eastBracket, "r1")
+        + confSection("Western Conference — First Round", null, playoffs.westBracket, "r1");
+    } else if (stepIdx === 2){
+      return confSection("Eastern Conference — Semifinals", null, playoffs.eastBracket, "r2")
+        + confSection("Western Conference — Semifinals", null, playoffs.westBracket, "r2");
+    } else if (stepIdx === 3){
+      return confSection("Eastern Conference Finals", null, playoffs.eastBracket, "cf")
+        + confSection("Western Conference Finals", null, playoffs.westBracket, "cf");
+    } else {
+      return '<div class="bball-po-round"><div class="bball-po-round-title">NBA Finals</div>'
+        + bballSeriesRowHtml(playoffs.finals, season.userTeam) + '</div>'
+        + '<p class="chess-status" style="margin-top:14px;">' + playoffs.userResult + '</p>';
+    }
+  }
+
+  function bballRenderPlayoffStep(){
+    document.getElementById("bballPlayoffStepLabel").textContent = bballPlayoffSteps[bballPlayoffStepIdx];
+    document.getElementById("bballPlayoffStepContent").innerHTML =
+      bballPlayoffStepHtml(bballPlayoffStepIdx, bballLastSeasonResult, bballLastPlayoffResult);
+    document.getElementById("bballPlayoffPrevBtn").style.visibility = bballPlayoffStepIdx === 0 ? "hidden" : "visible";
+    document.getElementById("bballPlayoffNextBtn").style.visibility = bballPlayoffStepIdx === bballPlayoffSteps.length - 1 ? "hidden" : "visible";
+    var dots = document.getElementById("bballPlayoffDots");
+    dots.innerHTML = "";
+    bballPlayoffSteps.forEach(function(s, i){
+      var d = document.createElement("div");
+      d.className = "bball-po-dot" + (i === bballPlayoffStepIdx ? " active" : "");
+      dots.appendChild(d);
+    });
+  }
+
+  // ---- Loading-bar sequencing ----
+  function bballRunProgressBar(fillId, durationMs, onDone){
+    var fill = document.getElementById(fillId);
+    fill.style.transition = "none";
+    fill.style.width = "0%";
+    // Force layout so the reset above is committed before re-enabling the transition.
+    void fill.offsetWidth;
+    fill.style.transition = "width " + durationMs + "ms cubic-bezier(.2,.6,.3,1)";
+    requestAnimationFrame(function(){ fill.style.width = "100%"; });
+    setTimeout(onDone, durationMs + 150);
+  }
+
+  function bballStartSeasonSim(){
+    document.getElementById("bballSeasonResults").style.display = "none";
+    document.getElementById("bballPlayoffLoading").style.display = "none";
+    document.getElementById("bballPlayoffResults").style.display = "none";
+    document.getElementById("bballSeasonLoading").style.display = "block";
+    bballRunProgressBar("bballSeasonProgressFill", 2200, function(){
+      bballLastSeasonResult = bballSimulateRegularSeasonPhase();
+      bballLastPlayoffResult = null;
+      bballUpdateSeasonStats(bballLastSeasonResult.userRecord.wins, bballLastSeasonResult.userRecord.losses);
+      bballRenderRegularSeasonResults(bballLastSeasonResult);
+      document.getElementById("bballSeasonLoading").style.display = "none";
+      document.getElementById("bballSeasonResults").style.display = "block";
+      document.querySelectorAll(".bball-season-tab").forEach(function(tab, i){ tab.classList.toggle("active", i === 0); });
+      document.getElementById("bballSeasonOverview").style.display = "block";
+      document.getElementById("bballSeasonStandings").style.display = "none";
+    });
+  }
+
+  function bballStartPlayoffSim(){
+    document.getElementById("bballSeasonResults").style.display = "none";
+    document.getElementById("bballPlayoffLoading").style.display = "block";
+    bballRunProgressBar("bballPlayoffProgressFill", 2200, function(){
+      bballLastPlayoffResult = bballSimulatePlayoffsPhase(bballLastSeasonResult);
+      bballUpdatePlayoffStats(bballLastPlayoffResult.userRank);
+      bballPlayoffStepIdx = 0;
+      bballRenderPlayoffStep();
+      document.getElementById("bballPlayoffLoading").style.display = "none";
+      document.getElementById("bballPlayoffResults").style.display = "block";
+    });
   }
 
   function bballOpenSeason(){
-    bballLastSeasonResult = bballSimulateFullSeason();
-    bballRenderSeasonResults(bballLastSeasonResult);
     document.getElementById("bballComplete").style.display = "none";
     document.getElementById("bballSeason").style.display = "block";
-    document.querySelectorAll(".bball-season-tab").forEach(function(tab, i){ tab.classList.toggle("active", i === 0); });
-    document.getElementById("bballSeasonOverview").style.display = "block";
-    document.getElementById("bballSeasonStandings").style.display = "none";
-    document.getElementById("bballSeasonPlayoffs").style.display = "none";
+    bballStartSeasonSim();
+  }
+
+  // ---- Career stats persistence ----
+  var BSTATS_KEY = "basketballDraftCareerStats";
+  var bstats = { bestGradeIdx:null, bestGradeText:null, bestPRA:null, bestSeasonWins:null, bestSeasonRecord:null, bestPlayoffRank:null, bestPlayoffText:null };
+  var PLAYOFF_RANK_LABELS = [
+    "Missed the Playoffs", "Eliminated in the Play-In", "Lost in the First Round",
+    "Lost in the Conference Semifinals", "Lost in the Conference Finals",
+    "Lost the NBA Finals", "🏆 NBA Champions"
+  ];
+  function bballLoadStats(){
+    try{
+      var raw = localStorage.getItem(BSTATS_KEY);
+      if (raw) bstats = JSON.parse(raw);
+    }catch(e){}
+  }
+  function bballSaveStats(){
+    try{ localStorage.setItem(BSTATS_KEY, JSON.stringify(bstats)); }catch(e){}
+  }
+  function bballUpdateGradeStats(grade){
+    if (grade.estTotal == null) return;
+    var idx = -1;
+    for (var i=0;i<BBALL_GRADE_TIERS.length;i++){ if (BBALL_GRADE_TIERS[i].grade === grade.grade){ idx = i; break; } }
+    if (idx !== -1 && (bstats.bestGradeIdx === null || idx < bstats.bestGradeIdx)){
+      bstats.bestGradeIdx = idx;
+      bstats.bestGradeText = grade.grade + " — " + grade.label;
+    }
+    if (bstats.bestPRA === null || grade.estTotal > bstats.bestPRA){
+      bstats.bestPRA = grade.estTotal;
+    }
+    bballSaveStats();
+  }
+  function bballUpdateSeasonStats(wins, losses){
+    if (bstats.bestSeasonWins === null || wins > bstats.bestSeasonWins){
+      bstats.bestSeasonWins = wins;
+      bstats.bestSeasonRecord = wins + "-" + losses;
+      bballSaveStats();
+    }
+  }
+  function bballUpdatePlayoffStats(rank){
+    if (bstats.bestPlayoffRank === null || rank > bstats.bestPlayoffRank){
+      bstats.bestPlayoffRank = rank;
+      bstats.bestPlayoffText = PLAYOFF_RANK_LABELS[rank];
+      bballSaveStats();
+    }
+  }
+  function bballRenderStats(){
+    function card(label, value, sub){
+      return '<div class="bball-stat-card"><div class="bball-stat-card-label">' + label + '</div>'
+        + '<div class="bball-stat-card-value">' + value + '</div>'
+        + (sub ? ('<div class="bball-stat-card-sub">' + sub + '</div>') : '') + '</div>';
+    }
+    var html = "";
+    html += card("Best Grade", bstats.bestGradeText || "—", bstats.bestGradeText ? "Highest team grade drafted so far." : "Finish a draft to set your first record.");
+    html += card("Best Overall P+R+A", bstats.bestPRA !== null ? bstats.bestPRA.toFixed(1) : "—", "Combined PPG+RPG+APG average across your five, ×5.");
+    html += card("Best Season Sim", bstats.bestSeasonRecord || "—", "Best regular-season record across all simulated seasons.");
+    html += card("Best Playoff Result", bstats.bestPlayoffText || "—", "Furthest run through the postseason you've achieved.");
+    document.getElementById("bballStatsBody").innerHTML = html;
   }
 
   document.getElementById("bballSimSeasonBtn").addEventListener("click", bballOpenSeason);
-  document.getElementById("bballSeasonReplayBtn").addEventListener("click", bballOpenSeason);
+  document.getElementById("bballSeasonReplayBtn").addEventListener("click", bballStartSeasonSim);
   document.getElementById("bballSeasonMenuBtn").addEventListener("click", openBballDraft);
+  document.getElementById("bballSimPlayoffsBtn").addEventListener("click", bballStartPlayoffSim);
+  document.getElementById("bballPlayoffPrevBtn").addEventListener("click", function(){
+    if (bballPlayoffStepIdx > 0){ bballPlayoffStepIdx--; bballRenderPlayoffStep(); }
+  });
+  document.getElementById("bballPlayoffNextBtn").addEventListener("click", function(){
+    if (bballPlayoffStepIdx < bballPlayoffSteps.length - 1){ bballPlayoffStepIdx++; bballRenderPlayoffStep(); }
+  });
   document.querySelectorAll(".bball-season-tab").forEach(function(tab){
     tab.addEventListener("click", function(){
       document.querySelectorAll(".bball-season-tab").forEach(function(t){ t.classList.remove("active"); });
@@ -4278,7 +4512,6 @@
       var target = tab.dataset.tab;
       document.getElementById("bballSeasonOverview").style.display = target === "overview" ? "block" : "none";
       document.getElementById("bballSeasonStandings").style.display = target === "standings" ? "block" : "none";
-      document.getElementById("bballSeasonPlayoffs").style.display = target === "playoffs" ? "block" : "none";
     });
   });
 
@@ -4290,10 +4523,29 @@
   // "Draft Menu" stays inside the Basketball Draft mini-game — it returns to this game's own
   // Begin Draft setup screen, rather than exiting out to the Fox Games main menu.
   document.getElementById("bballMainMenuBtn").addEventListener("click", openBballDraft);
+  document.getElementById("bballConfirmFavoriteBtn").addEventListener("click", bballConfirmFavoriteTeam);
+  document.getElementById("bballStatsBtn").addEventListener("click", function(){
+    bballRenderStats();
+    document.getElementById("bballStatsPage").style.display = "block";
+  });
+  document.getElementById("bballStatsCloseBtn").addEventListener("click", function(){
+    document.getElementById("bballStatsPage").style.display = "none";
+  });
 
+  // Populate the favorite-team dropdown once, in real alphabetical order.
+  (function(){
+    var select = document.getElementById("bballFavoriteTeamSelect");
+    BBALL_TEAMS.slice().sort().forEach(function(t){
+      var opt = document.createElement("option");
+      opt.value = t; opt.textContent = t;
+      select.appendChild(opt);
+    });
+  })();
 
+  bballLoadStats();
   openBballDraft();
 })();
 </script>
+
 </body>
 </html>
