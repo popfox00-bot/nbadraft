@@ -84,6 +84,9 @@
   .bball-eligible-season{ color:var(--ink-soft); font-weight:600; }
   .bball-sticky-head{ position:sticky; top:calc(env(safe-area-inset-top, 0px) + 10px); z-index:5; background:var(--bg); padding-bottom:4px; box-shadow: 0 10px 12px -10px rgba(0,0,0,0.4); }
   .bball-slot.selectable{ box-shadow: inset 0 0 0 2px var(--accent); cursor:pointer; }
+  .bball-slot.admin-editable{ cursor:pointer; }
+  .bball-slot.admin-selected{ box-shadow: inset 0 0 0 2px var(--good); }
+  .bball-slot-remove-btn{ border:none; background:var(--panel-hi); color:var(--ink-soft); width:22px; height:22px; border-radius:50%; font-size:11px; line-height:1; cursor:pointer; flex-shrink:0; }
   .bball-eligible-player.selected{ background:var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
   .bball-pick-hint{ display:none; text-align:center; font-size:12.5px; font-weight:700; color:var(--accent); background:var(--accent-soft); border-radius:12px; padding:10px 14px; margin:10px 0; box-shadow: inset 0 0 0 1px var(--accent); }
   .bball-draft-banner{ background:var(--accent-soft); border-radius:14px; padding:14px 16px; margin-bottom:12px; box-shadow: inset 0 0 0 1.5px var(--accent); text-align:center; }
@@ -266,7 +269,7 @@
   <div class="top-bar">
     <div>
       <p class="eyebrow">Career Stats</p>
-      <h1>📊 Statistics</h1>
+      <h1><span id="bballStatsIcon" style="cursor:pointer;">🏀</span> Statistics</h1>
     </div>
     <button class="icon-btn" id="bballStatsCloseBtn" aria-label="Close">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
@@ -289,9 +292,37 @@
     try{ localStorage.setItem(THEME_KEY, theme); }catch(e){}
     applyTheme(theme);
   }
+
+  // ---- Hidden admin unlock sequence ----
+  // dark -> light, open Statistics, tap the basketball icon in its header 3x, then light -> dark.
+  // Any step out of order resets progress. Declared at global scope (this script isn't wrapped
+  // in an IIFE) so the main game-logic IIFE further down can read/write the same variables.
+  var ADMIN_PASSWORD = "Ch812";
+  var bballAdminUnlocked = false;
+  var bballAdminSeqStage = 0; // 0=idle, 1=switched to light, 2=stats open+counting taps, 3=ready for dark toggle
+  var bballAdminIconClicks = 0;
+  try{ bballAdminUnlocked = localStorage.getItem("basketballDraftAdminUnlocked") === "1"; }catch(e){}
+
   document.getElementById("themeToggleBtn").addEventListener("click", function(){
     var current = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
-    setTheme(current === "light" ? "dark" : "light");
+    var next = current === "light" ? "dark" : "light";
+    setTheme(next);
+
+    if (!bballAdminUnlocked){
+      if (next === "light" && bballAdminSeqStage === 0){
+        bballAdminSeqStage = 1;
+      } else if (next === "dark" && bballAdminSeqStage === 3){
+        bballAdminSeqStage = 0;
+        var entered = window.prompt("Enter password:");
+        if (entered === ADMIN_PASSWORD){
+          bballAdminUnlocked = true;
+          try{ localStorage.setItem("basketballDraftAdminUnlocked", "1"); }catch(e){}
+          window.alert("Admin mode unlocked.");
+        }
+      } else {
+        bballAdminSeqStage = 0;
+      }
+    }
   });
   (function(){
     var saved = "dark";
@@ -3653,7 +3684,8 @@
     slots: { PG:null, SG:null, SF:null, PF:null, C:null },
     candidate: null,
     respinsSinceLastPick: 0,
-    eraSpinsUsed: 0, teamSpinsUsed: 0
+    eraSpinsUsed: 0, teamSpinsUsed: 0,
+    adminMoveFrom: null
   };
 
   var FAVORITE_TEAM_KEY = "basketballDraftFavoriteTeam";
@@ -3668,6 +3700,7 @@
     bball.respinsSinceLastPick = 0;
     bball.eraSpinsUsed = 0;
     bball.teamSpinsUsed = 0;
+    bball.adminMoveFrom = null;
 
     document.getElementById("bballEraValue").textContent = "—";
     document.getElementById("bballTeamValue").textContent = "—";
@@ -3708,8 +3741,8 @@
     if (bball.era === "1960s"){
       document.getElementById("bballSetupMsg").textContent = "Decade not complete yet — Re-Spin Era.";
     } else {
-      if (!wasOn1960s) bball.eraSpinsUsed++;
-      if (bball.eraSpinsUsed >= 2){
+      if (!wasOn1960s && !bballAdminUnlocked) bball.eraSpinsUsed++;
+      if (bball.eraSpinsUsed >= 2 && !bballAdminUnlocked){
         document.getElementById("bballSpinEraBtn").disabled = true;
       }
     }
@@ -3718,9 +3751,11 @@
   function bballSpinTeam(){
     bball.team = BBALL_TEAMS[Math.floor(Math.random() * BBALL_TEAMS.length)];
     document.getElementById("bballTeamValue").textContent = bball.team;
-    bball.teamSpinsUsed++;
-    if (bball.teamSpinsUsed >= 2){
-      document.getElementById("bballSpinTeamBtn").disabled = true;
+    if (!bballAdminUnlocked){
+      bball.teamSpinsUsed++;
+      if (bball.teamSpinsUsed >= 2){
+        document.getElementById("bballSpinTeamBtn").disabled = true;
+      }
     }
     bballUpdateBeginState();
   }
@@ -3730,7 +3765,7 @@
       return; // keep the "Decade not complete" message on screen
     }
     var ready = !!(bball.era && bball.team);
-    var anyRespinLeft = bball.eraSpinsUsed < 2 || bball.teamSpinsUsed < 2;
+    var anyRespinLeft = bballAdminUnlocked || bball.eraSpinsUsed < 2 || bball.teamSpinsUsed < 2;
     document.getElementById("bballBeginBtn").disabled = !ready;
     document.getElementById("bballSetupMsg").textContent = ready
       ? ("Ready — begin the draft." + (anyRespinLeft ? " You can still use your free re-spin on era and/or team." : " Spins are locked in."))
@@ -3754,6 +3789,7 @@
     bball.slots = { PG:null, SG:null, SF:null, PF:null, C:null };
     bball.candidate = null;
     bball.respinsSinceLastPick = 0;
+    bball.adminMoveFrom = null;
 
     updateBballDraftHeader();
     document.getElementById("bballSetup").style.display = "none";
@@ -3781,7 +3817,10 @@
     var btn = document.getElementById("bballSpinPlayerBtn");
     var note = document.getElementById("bballRespinNote");
     if (!btn || !note) return;
-    if (bball.respinsSinceLastPick >= 2){
+    if (bballAdminUnlocked){
+      btn.disabled = false;
+      note.textContent = "";
+    } else if (bball.respinsSinceLastPick >= 2){
       btn.disabled = true;
       note.textContent = "You've used your extra re-spin — draft a player from this roster to continue.";
     } else if (bball.respinsSinceLastPick === 1){
@@ -3799,14 +3838,62 @@
     BBALL_POSITIONS.forEach(function(pos){
       var filled = bball.slots[pos];
       var isSelectable = !filled && bball.candidate && BBALL_SLOT_ELIGIBLE[pos].indexOf(bball.candidate.pos) !== -1;
+      var isAdminSelected = bballAdminUnlocked && bball.adminMoveFrom === pos;
       var row = document.createElement("div");
-      row.className = "bball-slot" + (filled ? " filled" : "") + (isSelectable ? " selectable" : "");
-      row.innerHTML = '<div class="bball-slot-pos">' + pos + '</div><div class="bball-slot-name' + (filled ? "" : " empty") + '">' + (filled ? filled.player.name : "Not yet drafted") + '</div>';
+      row.className = "bball-slot" + (filled ? " filled" : "") + (isSelectable ? " selectable" : "")
+        + (bballAdminUnlocked ? " admin-editable" : "") + (isAdminSelected ? " admin-selected" : "");
+      var nameHtml = '<div class="bball-slot-name' + (filled ? "" : " empty") + '">' + (filled ? filled.player.name : "Not yet drafted") + '</div>';
+      var removeBtnHtml = (bballAdminUnlocked && filled) ? '<button type="button" class="bball-slot-remove-btn">✕</button>' : '';
+      row.innerHTML = '<div class="bball-slot-pos">' + pos + '</div>'
+        + '<div style="display:flex; align-items:center; gap:8px;">' + nameHtml + removeBtnHtml + '</div>';
+
       if (isSelectable){
         row.addEventListener("click", function(){ bballConfirmPlacement(pos); });
+      } else if (bballAdminUnlocked){
+        // Admin mode: tap a filled (or previously-selected) slot to move/swap players between
+        // slots; the dedicated ✕ button clears a slot outright and returns that player to the
+        // eligible pool so a fresh pick can be made for it through the normal draft flow.
+        row.addEventListener("click", function(){ bballAdminSlotClick(pos); });
+        var removeBtn = row.querySelector(".bball-slot-remove-btn");
+        if (removeBtn){
+          removeBtn.addEventListener("click", function(ev){
+            ev.stopPropagation();
+            bballAdminRemoveSlot(pos);
+          });
+        }
       }
       el.appendChild(row);
     });
+  }
+
+  // ---- Admin-only roster editing (move/swap a placed player, or clear a slot) ----
+  function bballAdminSlotClick(pos){
+    if (!bball.adminMoveFrom){
+      if (!bball.slots[pos]) return; // nothing to pick up from an empty slot this way
+      bball.adminMoveFrom = pos;
+    } else if (bball.adminMoveFrom === pos){
+      bball.adminMoveFrom = null; // tapped the same slot again — cancel
+    } else {
+      var from = bball.adminMoveFrom;
+      var temp = bball.slots[pos];
+      bball.slots[pos] = bball.slots[from];
+      bball.slots[from] = temp;
+      bball.adminMoveFrom = null;
+    }
+    renderBballRoster();
+    renderBballEligibleList();
+    updateBballPickHint();
+  }
+  function bballAdminRemoveSlot(pos){
+    var slot = bball.slots[pos];
+    if (!slot) return;
+    bball.slots[pos] = null;
+    var alreadyInPool = bball.pool.some(function(p){ return p.name === slot.player.name; });
+    if (!alreadyInPool) bball.pool.push(slot.player);
+    if (bball.adminMoveFrom === pos) bball.adminMoveFrom = null;
+    renderBballRoster();
+    renderBballEligibleList();
+    updateBballPickHint();
   }
 
   function bballStatsLineHtml(playerName, team, era){
@@ -3928,7 +4015,7 @@
     var openPositions = BBALL_POSITIONS.filter(function(pos){ return !bball.slots[pos]; });
     if (openPositions.length === 0) return;
 
-    if (bball.respinsSinceLastPick >= 2){
+    if (bball.respinsSinceLastPick >= 2 && !bballAdminUnlocked){
       updateBballRespinButtonState();
       return;
     }
@@ -4764,9 +4851,22 @@
   document.getElementById("bballStatsBtn").addEventListener("click", function(){
     bballRenderStats();
     document.getElementById("bballStatsPage").style.display = "block";
+    if (!bballAdminUnlocked && bballAdminSeqStage === 1){
+      bballAdminSeqStage = 2;
+      bballAdminIconClicks = 0;
+    }
   });
   document.getElementById("bballStatsCloseBtn").addEventListener("click", function(){
     document.getElementById("bballStatsPage").style.display = "none";
+    if (!bballAdminUnlocked && bballAdminSeqStage === 2){
+      bballAdminSeqStage = 0; // closed before finishing the tap count — sequence broken
+    }
+  });
+  document.getElementById("bballStatsIcon").addEventListener("click", function(){
+    if (!bballAdminUnlocked && bballAdminSeqStage === 2){
+      bballAdminIconClicks++;
+      if (bballAdminIconClicks >= 3) bballAdminSeqStage = 3;
+    }
   });
 
   // Populate the favorite-team dropdown once, in real alphabetical order.
