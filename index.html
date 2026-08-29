@@ -257,10 +257,7 @@
         <div class="bball-po-dots" id="bballPlayoffDots"></div>
       </div>
 
-      <div class="sol-action-row">
-        <button class="text-btn" id="bballSeasonReplayBtn" style="margin-top:0;">Re-Simulate</button>
-        <button class="text-btn" id="bballSeasonMenuBtn" style="margin-top:0;">Draft Menu</button>
-      </div>
+      <button class="text-btn" id="bballSeasonMenuBtn">Draft Menu</button>
     </div>
   </div>
 </div>
@@ -3655,7 +3652,8 @@
     roster: [], pool: [],
     slots: { PG:null, SG:null, SF:null, PF:null, C:null },
     candidate: null,
-    respinsSinceLastPick: 0
+    respinsSinceLastPick: 0,
+    eraSpinsUsed: 0, teamSpinsUsed: 0
   };
 
   var FAVORITE_TEAM_KEY = "basketballDraftFavoriteTeam";
@@ -3668,11 +3666,15 @@
     bball.slots = { PG:null, SG:null, SF:null, PF:null, C:null };
     bball.candidate = null;
     bball.respinsSinceLastPick = 0;
+    bball.eraSpinsUsed = 0;
+    bball.teamSpinsUsed = 0;
 
     document.getElementById("bballEraValue").textContent = "—";
     document.getElementById("bballTeamValue").textContent = "—";
     document.getElementById("bballSetupMsg").textContent = "Spin both to begin.";
     document.getElementById("bballBeginBtn").disabled = true;
+    document.getElementById("bballSpinEraBtn").disabled = false;
+    document.getElementById("bballSpinTeamBtn").disabled = false;
 
     var savedFavorite = null;
     try{ savedFavorite = localStorage.getItem(FAVORITE_TEAM_KEY); }catch(e){}
@@ -3695,21 +3697,43 @@
     document.getElementById("bballSetup").style.display = "block";
   }
 
+  // Era spins are capped at one initial spin + one free re-spin, then the button locks —
+  // except landing on (or escaping from) the still-incomplete 1960s data set, which never
+  // counts against that budget so the player always has a free way past it.
   function bballSpinEra(){
+    var wasOn1960s = bball.era === "1960s";
     bball.era = BBALL_ERAS[Math.floor(Math.random() * BBALL_ERAS.length)];
     document.getElementById("bballEraValue").textContent = bball.era;
+
+    if (bball.era === "1960s"){
+      document.getElementById("bballSetupMsg").textContent = "Decade not complete yet — Re-Spin Era.";
+    } else {
+      if (!wasOn1960s) bball.eraSpinsUsed++;
+      if (bball.eraSpinsUsed >= 2){
+        document.getElementById("bballSpinEraBtn").disabled = true;
+      }
+    }
     bballUpdateBeginState();
   }
   function bballSpinTeam(){
     bball.team = BBALL_TEAMS[Math.floor(Math.random() * BBALL_TEAMS.length)];
     document.getElementById("bballTeamValue").textContent = bball.team;
+    bball.teamSpinsUsed++;
+    if (bball.teamSpinsUsed >= 2){
+      document.getElementById("bballSpinTeamBtn").disabled = true;
+    }
     bballUpdateBeginState();
   }
   function bballUpdateBeginState(){
+    if (bball.era === "1960s"){
+      document.getElementById("bballBeginBtn").disabled = true;
+      return; // keep the "Decade not complete" message on screen
+    }
     var ready = !!(bball.era && bball.team);
+    var anyRespinLeft = bball.eraSpinsUsed < 2 || bball.teamSpinsUsed < 2;
     document.getElementById("bballBeginBtn").disabled = !ready;
     document.getElementById("bballSetupMsg").textContent = ready
-      ? "Ready — begin the draft, or spin again to reroll either one."
+      ? ("Ready — begin the draft." + (anyRespinLeft ? " You can still use your free re-spin on era and/or team." : " Spins are locked in."))
       : "Spin both to begin.";
   }
 
@@ -3718,7 +3742,11 @@
     var roster = eraData ? eraData[bball.team] : null;
     if (!roster){
       document.getElementById("bballSetupMsg").textContent =
-        "No roster data yet for the " + bball.team + " in the " + bball.era + " — try spinning again. (This starter set covers a few eras/teams so far; more get added over time.)";
+        "No roster data yet for the " + bball.team + " in the " + bball.era + " — free re-spin granted, try again.";
+      bball.eraSpinsUsed = 0;
+      bball.teamSpinsUsed = 0;
+      document.getElementById("bballSpinEraBtn").disabled = false;
+      document.getElementById("bballSpinTeamBtn").disabled = false;
       return;
     }
     bball.roster = roster;
@@ -3954,13 +3982,40 @@
     return (total / statLines.length) * 5;
   }
 
+  // Silent performance bonuses — never announced anywhere, just folded into the numbers
+  // used for simulated stats, awards, and game/series outcomes. A player gets +5% when
+  // slotted into the position they actually played historically (checked against the real
+  // position on their roster entry, not just where BBALL_SLOT_ELIGIBLE allows them to sit).
+  // Separately, if two or more drafted players were real teammates (same team AND same era),
+  // the whole team gets a +5% chemistry bonus for the pair, plus another +5% for each
+  // additional real teammate beyond the first two (3 sharing = +10%, 4 = +15%, 5 = +20%).
+  // Only the largest such group counts, so mismatched partial pairs don't stack oddly.
+  function bballNaturalPositionBonus(pos, slot){
+    return (slot && slot.player && slot.player.pos === pos) ? 0.05 : 0;
+  }
+  function bballTeamChemistryBonus(){
+    var groups = {};
+    BBALL_POSITIONS.forEach(function(pos){
+      var slot = bball.slots[pos];
+      if (!slot) return;
+      var key = slot.team + "|" + slot.era;
+      groups[key] = (groups[key] || 0) + 1;
+    });
+    var maxSize = 0;
+    for (var k in groups){ if (groups[k] > maxSize) maxSize = groups[k]; }
+    return maxSize >= 2 ? 0.05 * (maxSize - 1) : 0;
+  }
+
   function bballUserRating(){
     var lines = [];
+    var chemBonus = bballTeamChemistryBonus();
     BBALL_POSITIONS.forEach(function(pos){
       var slot = bball.slots[pos];
       if (!slot) return;
       var s = bballStatsFor(slot.player.name, slot.team, slot.era);
-      if (s) lines.push(s);
+      if (!s) return;
+      var mult = 1 + bballNaturalPositionBonus(pos, slot) + chemBonus;
+      lines.push({ ppg: s.ppg * mult, rpg: s.rpg * mult, apg: s.apg * mult });
     });
     return ratingFromStatLines(lines);
   }
@@ -4415,12 +4470,14 @@
   }
   function bballSimulatePlayerStatLines(){
     var lines = [];
+    var chemBonus = bballTeamChemistryBonus();
     BBALL_POSITIONS.forEach(function(pos){
       var slot = bball.slots[pos];
       if (!slot) return;
       var real = bballStatsFor(slot.player.name, slot.team, slot.era);
       if (!real) return;
-      var ppg = bballVaryStat(real.ppg), rpg = bballVaryStat(real.rpg), apg = bballVaryStat(real.apg);
+      var mult = 1 + bballNaturalPositionBonus(pos, slot) + chemBonus;
+      var ppg = bballVaryStat(real.ppg) * mult, rpg = bballVaryStat(real.rpg) * mult, apg = bballVaryStat(real.apg) * mult;
       lines.push({ pos: pos, name: slot.player.name, team: slot.team, era: slot.era, ppg: ppg, rpg: rpg, apg: apg, combined: ppg + rpg + apg });
     });
     return lines;
@@ -4559,6 +4616,12 @@
 
   // ---- Career stats persistence ----
   var BSTATS_KEY = "basketballDraftCareerStats";
+  var BSTATS_DEFAULTS = {
+    bestGradeIdx:null, bestGradeText:null, bestPRA:null, bestSeasonWins:null, bestSeasonRecord:null, bestPlayoffRank:null, bestPlayoffText:null,
+    bestPlayerSeasonScore:null, bestPlayerSeasonText:null,
+    bestPlayoffPlayerScore:null, bestPlayoffPlayerText:null,
+    totalAwardsWon:0, bestAwardsSeasonCount:null, bestAwardsSeasonText:null
+  };
   var bstats = {
     bestGradeIdx:null, bestGradeText:null, bestPRA:null, bestSeasonWins:null, bestSeasonRecord:null, bestPlayoffRank:null, bestPlayoffText:null,
     bestPlayerSeasonScore:null, bestPlayerSeasonText:null,
@@ -4570,10 +4633,21 @@
     "Lost in the Conference Semifinals", "Lost in the Conference Finals",
     "Lost the NBA Finals", "🏆 NBA Champions"
   ];
+  // Merges saved data over the defaults (rather than replacing bstats outright) so that
+  // any field added in a later version of this app — one that didn't exist in a person's
+  // previously-saved data — safely falls back to its proper default instead of silently
+  // becoming `undefined`, which would otherwise break every future comparison against it.
   function bballLoadStats(){
     try{
       var raw = localStorage.getItem(BSTATS_KEY);
-      if (raw) bstats = JSON.parse(raw);
+      if (raw){
+        var parsed = JSON.parse(raw);
+        var merged = {};
+        for (var k in BSTATS_DEFAULTS){
+          merged[k] = (parsed[k] !== undefined) ? parsed[k] : BSTATS_DEFAULTS[k];
+        }
+        bstats = merged;
+      }
     }catch(e){}
   }
   function bballSaveStats(){
@@ -4659,7 +4733,6 @@
   }
 
   document.getElementById("bballSimSeasonBtn").addEventListener("click", bballOpenSeason);
-  document.getElementById("bballSeasonReplayBtn").addEventListener("click", bballStartSeasonSim);
   document.getElementById("bballSeasonMenuBtn").addEventListener("click", openBballDraft);
   document.getElementById("bballSimPlayoffsBtn").addEventListener("click", bballStartPlayoffSim);
   document.getElementById("bballPlayoffPrevBtn").addEventListener("click", function(){
