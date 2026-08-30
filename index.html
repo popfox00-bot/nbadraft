@@ -195,6 +195,15 @@
         </div>
       </div>
       <p class="chess-status" id="bballSetupMsg">Spin both to begin.</p>
+      <div id="bballAdminControls" style="display:none;">
+        <p class="chess-status" style="margin-top:16px; margin-bottom:8px;">Admin — jump directly to an era/team:</p>
+        <select id="bballAdminEraSelect" class="bball-team-select">
+          <option value="">Choose era…</option>
+        </select>
+        <select id="bballAdminTeamSelect" class="bball-team-select" style="margin-top:10px;">
+          <option value="">Choose team…</option>
+        </select>
+      </div>
       <button class="text-btn" id="bballBeginBtn" disabled>Begin Draft</button>
     </div>
 
@@ -317,6 +326,7 @@
         if (entered === ADMIN_PASSWORD){
           bballAdminUnlocked = true;
           try{ localStorage.setItem("basketballDraftAdminUnlocked", "1"); }catch(e){}
+          if (window.bballRefreshAdminControls) window.bballRefreshAdminControls();
           window.alert("Admin mode unlocked.");
         }
       } else {
@@ -2589,16 +2599,16 @@
     "Monte Morris|Denver|2020s": { ppg:10.2, rpg:2.0, apg:3.2, season:"2020-21" },
 
     // Los Angeles Lakers — 1970s (from the 1971-72 record-setting 69-13 title team)
-    "Jerry West|Los Angeles L|1970s": { ppg:25.8, rpg:4.2, apg:9.7, season:"1971-72" },
-    "Gail Goodrich|Los Angeles L|1970s": { ppg:25.9, rpg:3.6, apg:4.5, season:"1971-72" },
-    "Wilt Chamberlain|Los Angeles L|1970s": { ppg:14.8, rpg:19.2, apg:4.0, season:"1971-72" },
-    "Elgin Baylor|Los Angeles L|1970s": { ppg:11.8, rpg:6.3, apg:2.0, season:"1971-72" },
-    "Happy Hairston|Los Angeles L|1970s": { ppg:13.1, rpg:13.1, apg:2.4, season:"1971-72" },
-    "Jim McMillian|Los Angeles L|1970s": { ppg:18.8, rpg:6.5, apg:2.6, season:"1971-72" },
+    "Jerry West|Los Angeles L|1970s": { ppg:25.8, rpg:4.2, apg:9.7, fgPct:0.477, ftPct:0.814, season:"1971-72" },
+    "Gail Goodrich|Los Angeles L|1970s": { ppg:25.9, rpg:3.6, apg:4.5, fgPct:0.487, ftPct:0.850, season:"1971-72" },
+    "Wilt Chamberlain|Los Angeles L|1970s": { ppg:14.8, rpg:19.2, apg:4.0, fgPct:0.649, ftPct:0.422, season:"1971-72" },
+    "Elgin Baylor|Los Angeles L|1970s": { ppg:11.8, rpg:6.3, apg:2.0, fgPct:0.433, ftPct:0.815, season:"1971-72" },
+    "Happy Hairston|Los Angeles L|1970s": { ppg:13.1, rpg:13.1, apg:2.4, fgPct:0.461, ftPct:0.779, season:"1971-72" },
+    "Jim McMillian|Los Angeles L|1970s": { ppg:18.8, rpg:6.5, apg:2.6, fgPct:0.482, ftPct:0.791, season:"1971-72" },
     "Kareem Abdul-Jabbar|Los Angeles L|1970s": { ppg:26.2, rpg:13.3, apg:3.9, season:"1976-77" },
-    "Lucius Allen|Los Angeles L|1970s": { ppg:14.6, rpg:3.2, apg:5.2, season:"1976-77" },
-    "Cazzie Russell|Los Angeles L|1970s": { ppg:16.4, rpg:3.6, apg:2.6, season:"1976-77" },
-    "Jamaal Wilkes|Los Angeles L|1970s": { ppg:20.0, rpg:6.4, apg:3.0, season:"1979-80" },
+    "Lucius Allen|Los Angeles L|1970s": { ppg:14.6, rpg:3.2, apg:5.2, spg:1.5, bpg:0.2, fgPct:0.456, ftPct:0.774, season:"1976-77" },
+    "Cazzie Russell|Los Angeles L|1970s": { ppg:16.4, rpg:3.6, apg:2.6, spg:1.0, bpg:0.1, fgPct:0.490, ftPct:0.858, season:"1976-77" },
+    "Jamaal Wilkes|Los Angeles L|1970s": { ppg:20.0, rpg:6.4, apg:3.0, spg:1.6, bpg:0.3, fgPct:0.535, threePct:0.176, ftPct:0.808, season:"1979-80" },
 
     // Los Angeles Lakers — 1980s (from the 1986-87 65-17 championship team, Magic's MVP season)
     "Magic Johnson|Los Angeles L|1980s": { ppg:23.9, rpg:6.3, apg:12.2, season:"1986-87" },
@@ -2678,12 +2688,12 @@
     "Dennis Schröder|Los Angeles L|2020s": { ppg:15.4, rpg:3.5, apg:5.8, season:"2020-21" },
 
     // Los Angeles Clippers — 1970s (Buffalo Braves era, from the 1973-74 conference semifinalist team)
-    "Bob McAdoo|Los Angeles C|1970s": { ppg:30.6, rpg:15.1, apg:2.3, season:"1973-74" },
-    "Jim McMillian|Los Angeles C|1970s": { ppg:18.6, rpg:7.4, apg:3.1, season:"1973-74" },
-    "Randy Smith|Los Angeles C|1970s": { ppg:15.5, rpg:3.8, apg:4.7, season:"1973-74" },
-    "Gar Heard|Los Angeles C|1970s": { ppg:15.3, rpg:11.7, apg:2.2, season:"1973-74" },
-    "Ernie DiGregorio|Los Angeles C|1970s": { ppg:15.2, rpg:2.7, apg:8.2, season:"1973-74" },
-    "Adrian Dantley|Los Angeles C|1970s": { ppg:20.3, rpg:7.6, apg:1.9, season:"1976-77" },
+    "Bob McAdoo|Los Angeles C|1970s": { ppg:30.6, rpg:15.1, apg:2.3, spg:1.2, bpg:3.3, fgPct:0.547, ftPct:0.793, season:"1973-74" },
+    "Jim McMillian|Los Angeles C|1970s": { ppg:18.6, rpg:7.4, apg:3.1, spg:1.6, bpg:0.3, fgPct:0.494, ftPct:0.858, season:"1973-74" },
+    "Randy Smith|Los Angeles C|1970s": { ppg:15.5, rpg:3.8, apg:4.7, spg:2.5, bpg:0.0, fgPct:0.492, ftPct:0.712, season:"1973-74" },
+    "Gar Heard|Los Angeles C|1970s": { ppg:15.3, rpg:11.7, apg:2.2, spg:1.7, bpg:2.8, fgPct:0.435, ftPct:0.650, season:"1973-74" },
+    "Ernie DiGregorio|Los Angeles C|1970s": { ppg:15.2, rpg:2.7, apg:8.2, ftPct:0.902, season:"1973-74" },
+    "Adrian Dantley|Los Angeles C|1970s": { ppg:20.3, rpg:7.6, apg:1.9, spg:1.2, bpg:0.2, fgPct:0.520, ftPct:0.818, season:"1976-77" },
     "John Shumate|Los Angeles C|1970s": { ppg:15.1, rpg:9.5, apg:2.1, season:"1976-77" },
     "Swen Nater|Los Angeles C|1970s": { ppg:15.5, rpg:13.2, apg:2.8, season:"1977-78" },
 
@@ -2746,13 +2756,13 @@
 
   // Golden State Warriors — 1970s (from the 1974-75 championship team, swept the Bullets)
   const BBALL_STATS_GSW1970S = {
-    "Rick Barry|Golden State|1970s": { ppg:30.6, rpg:5.7, apg:6.2, season:"1974-75" },
-    "Jamaal Wilkes|Golden State|1970s": { ppg:14.2, rpg:8.2, apg:2.2, season:"1974-75" },
-    "Charles Johnson|Golden State|1970s": { ppg:10.9, rpg:3.9, apg:3.0, season:"1974-75" },
-    "Clifford Ray|Golden State|1970s": { ppg:9.4, rpg:10.6, apg:2.2, season:"1974-75" },
-    "Phil Smith|Golden State|1970s": { ppg:11.4, rpg:2.5, apg:2.9, season:"1974-75" },
-    "Jeff Mullins|Golden State|1970s": { ppg:9.4, rpg:2.4, apg:2.4, season:"1974-75" },
-    "George Johnson|Golden State|1970s": { ppg:4.5, rpg:5.6, apg:0.6, season:"1974-75" },
+    "Rick Barry|Golden State|1970s": { ppg:30.6, rpg:5.7, apg:6.2, spg:2.9, bpg:0.4, fgPct:0.464, ftPct:0.904, season:"1974-75" },
+    "Jamaal Wilkes|Golden State|1970s": { ppg:14.2, rpg:8.2, apg:2.2, spg:1.3, bpg:0.3, fgPct:0.442, ftPct:0.734, season:"1974-75" },
+    "Charles Johnson|Golden State|1970s": { ppg:10.9, rpg:3.9, apg:3.0, spg:1.7, bpg:0.1, fgPct:0.412, ftPct:0.735, season:"1974-75" },
+    "Clifford Ray|Golden State|1970s": { ppg:9.4, rpg:10.6, apg:2.2, spg:1.2, bpg:1.4, fgPct:0.522, ftPct:0.602, season:"1974-75" },
+    "Phil Smith|Golden State|1970s": { ppg:7.7, rpg:1.9, apg:1.8, spg:0.8, bpg:0.0, fgPct:0.476, ftPct:0.804, season:"1974-75" },
+    "Jeff Mullins|Golden State|1970s": { ppg:8.2, rpg:1.9, apg:2.3, spg:0.9, bpg:0.2, fgPct:0.455, ftPct:0.816, season:"1974-75" },
+    "George Johnson|Golden State|1970s": { ppg:4.4, rpg:7.0, apg:0.8, spg:0.4, bpg:1.7, fgPct:0.476, ftPct:0.659, season:"1974-75" },
     "Nate Thurmond|Golden State|1970s": { ppg:17.1, rpg:17.1, apg:3.5, season:"1972-73" }
   };
   Object.assign(BBALL_STATS, BBALL_STATS_GSW1970S);
@@ -3690,6 +3700,12 @@
 
   var FAVORITE_TEAM_KEY = "basketballDraftFavoriteTeam";
 
+  function bballRefreshAdminControlsVisibility(){
+    var el = document.getElementById("bballAdminControls");
+    if (el) el.style.display = bballAdminUnlocked ? "block" : "none";
+  }
+  window.bballRefreshAdminControls = bballRefreshAdminControlsVisibility;
+
   function openBballDraft(){
     bball.era = null;
     bball.team = null;
@@ -3708,6 +3724,9 @@
     document.getElementById("bballBeginBtn").disabled = true;
     document.getElementById("bballSpinEraBtn").disabled = false;
     document.getElementById("bballSpinTeamBtn").disabled = false;
+    document.getElementById("bballAdminEraSelect").value = "";
+    document.getElementById("bballAdminTeamSelect").value = "";
+    bballRefreshAdminControlsVisibility();
 
     var savedFavorite = null;
     try{ savedFavorite = localStorage.getItem(FAVORITE_TEAM_KEY); }catch(e){}
@@ -3904,7 +3923,14 @@
       var startYear = parseInt(s.season.split("-")[0], 10);
       if (startYear < 2008) franchiseNote = ' <span class="bball-franchise-note">(Seattle SuperSonics)</span>';
     }
-    return '<div class="bball-eligible-stats">' + s.ppg.toFixed(1) + ' PPG · ' + s.rpg.toFixed(1) + ' RPG · ' + s.apg.toFixed(1) + ' APG <span class="bball-eligible-season">(' + s.season + ')</span>' + franchiseNote + '</div>';
+    var extra = "";
+    if (s.spg != null && s.bpg != null) extra += ' · ' + s.spg.toFixed(1) + ' SPG · ' + s.bpg.toFixed(1) + ' BPG';
+    if (s.fgPct != null){
+      extra += ' · ' + (s.fgPct*100).toFixed(1) + '% FG';
+      if (s.threePct != null) extra += ' · ' + (s.threePct*100).toFixed(1) + '% 3PT';
+      if (s.ftPct != null) extra += ' · ' + (s.ftPct*100).toFixed(1) + '% FT';
+    }
+    return '<div class="bball-eligible-stats">' + s.ppg.toFixed(1) + ' PPG · ' + s.rpg.toFixed(1) + ' RPG · ' + s.apg.toFixed(1) + ' APG' + extra + ' <span class="bball-eligible-season">(' + s.season + ')</span>' + franchiseNote + '</div>';
   }
 
   // The primary interactive picker: each pool player is listed exactly once, grouped under
@@ -4062,10 +4088,29 @@
   // Computes the same "combined-stat average x5" rating used for grading, from an
   // arbitrary list of {ppg,rpg,apg} stat lines. Shared by the user's drafted team
   // and every generated opponent team so ratings stay on one consistent scale.
+  // Central player-value calculation. Steals and blocks fold directly into the same
+  // "combined" total as PPG/RPG/APG when a player has real defensive stats on file; a
+  // shooting-efficiency multiplier (from FG%/3PT%/FT%) applies on top when that data exists.
+  // Crucially: for any player who doesn't have this data yet, spg/bpg default to 0 added and
+  // the multiplier defaults to exactly 1 — so nothing about today's numbers changes until
+  // real stats are backfilled for that player. No estimated/fabricated values are ever used.
+  function bballEfficiencyMultiplier(s){
+    if (s.fgPct == null) return 1;
+    var fgComponent = (s.fgPct - 0.46) * 1.2;
+    var threeComponent = (s.threePct != null ? (s.threePct - 0.35) : 0) * 0.6;
+    var ftComponent = (s.ftPct != null ? (s.ftPct - 0.78) : 0) * 0.3;
+    var mult = 1 + fgComponent + threeComponent + ftComponent;
+    return Math.max(0.85, Math.min(1.20, mult));
+  }
+  function bballPlayerCombinedValue(s){
+    var base = s.ppg + s.rpg + s.apg + (s.spg || 0) + (s.bpg || 0);
+    return base * bballEfficiencyMultiplier(s);
+  }
+
   function ratingFromStatLines(statLines){
     if (!statLines.length) return null;
     var total = 0;
-    statLines.forEach(function(s){ total += (s.ppg + s.rpg + s.apg); });
+    statLines.forEach(function(s){ total += bballPlayerCombinedValue(s); });
     return (total / statLines.length) * 5;
   }
 
@@ -4092,17 +4137,39 @@
     for (var k in groups){ if (groups[k] > maxSize) maxSize = groups[k]; }
     return maxSize >= 2 ? 0.05 * (maxSize - 1) : 0;
   }
+  // Rewards real floor-spacing: needs at least two drafted players with real 3PT% on file to
+  // matter at all, and only kicks in once the team's average 3PT% clears a "good enough to
+  // space the floor" bar (~34%). Stays at exactly 0 — no effect at all — until real shooting
+  // data exists for enough of the roster, which is the case for the entire dataset today.
+  function bballFloorSpacingBonus(){
+    var pcts = [];
+    BBALL_POSITIONS.forEach(function(pos){
+      var slot = bball.slots[pos];
+      if (!slot) return;
+      var s = bballStatsFor(slot.player.name, slot.team, slot.era);
+      if (s && s.threePct != null) pcts.push(s.threePct);
+    });
+    if (pcts.length < 2) return 0;
+    var avg = pcts.reduce(function(a,b){ return a + b; }, 0) / pcts.length;
+    return Math.min(0.08, Math.max(0, avg - 0.34) * 0.5);
+  }
 
   function bballUserRating(){
     var lines = [];
     var chemBonus = bballTeamChemistryBonus();
+    var spaceBonus = bballFloorSpacingBonus();
     BBALL_POSITIONS.forEach(function(pos){
       var slot = bball.slots[pos];
       if (!slot) return;
       var s = bballStatsFor(slot.player.name, slot.team, slot.era);
       if (!s) return;
-      var mult = 1 + bballNaturalPositionBonus(pos, slot) + chemBonus;
-      lines.push({ ppg: s.ppg * mult, rpg: s.rpg * mult, apg: s.apg * mult });
+      var mult = 1 + bballNaturalPositionBonus(pos, slot) + chemBonus + spaceBonus;
+      lines.push({
+        ppg: s.ppg * mult, rpg: s.rpg * mult, apg: s.apg * mult,
+        spg: s.spg != null ? s.spg * mult : undefined,
+        bpg: s.bpg != null ? s.bpg * mult : undefined,
+        fgPct: s.fgPct, threePct: s.threePct, ftPct: s.ftPct
+      });
     });
     return ratingFromStatLines(lines);
   }
@@ -4113,7 +4180,7 @@
       var slot = bball.slots[pos];
       if (!slot) return;
       var s = bballStatsFor(slot.player.name, slot.team, slot.era);
-      if (s){ total += (s.ppg + s.rpg + s.apg); counted++; }
+      if (s){ total += bballPlayerCombinedValue(s); counted++; }
     });
     if (counted === 0){
       return { grade:"—", label:"Unrated", blurb:"We don't have stat lines for these picks yet, so this roster can't be graded." };
@@ -4137,7 +4204,12 @@
       var row = document.createElement("div");
       row.className = "bball-slot filled";
       var statsLine = bballStatsFor(slot.player.name, slot.team, slot.era);
-      var sub = '<div class="bball-slot-sub">' + slot.team + ' — ' + slot.era + (statsLine ? (' · ' + statsLine.ppg.toFixed(1) + '/' + statsLine.rpg.toFixed(1) + '/' + statsLine.apg.toFixed(1)) : '') + '</div>';
+      var statsText = "";
+      if (statsLine){
+        statsText = statsLine.ppg.toFixed(1) + '/' + statsLine.rpg.toFixed(1) + '/' + statsLine.apg.toFixed(1);
+        if (statsLine.fgPct != null) statsText += ' · ' + (statsLine.fgPct*100).toFixed(1) + '% FG';
+      }
+      var sub = '<div class="bball-slot-sub">' + slot.team + ' — ' + slot.era + (statsText ? (' · ' + statsText) : '') + '</div>';
       row.innerHTML = '<div class="bball-slot-pos">' + pos + '</div><div><div class="bball-slot-name">' + slot.player.name + '</div>' + sub + '</div>';
       el.appendChild(row);
     });
@@ -4475,7 +4547,7 @@
         + '<div class="bball-stand-record">' + result.records[t].wins + '-' + result.records[t].losses + '</div>'
         + '</div>';
     });
-    overviewHtml += '</div><p class="chess-status">Ratings blend real per-game stats into a single power number; every game (and every best-of-7 series) is decided by that gap, with a home-court edge and always a little room for an upset. DPOY isn\'t awarded yet — this player data doesn\'t track steals or blocks.</p>';
+    overviewHtml += '</div><p class="chess-status">Ratings blend real per-game stats into a single power number; every game (and every best-of-7 series) is decided by that gap, with a home-court edge and always a little room for an upset. Shooting efficiency, floor spacing, and DPOY only count once real FG%/3PT%/FT%/steals/blocks are on file for a player — most of the dataset doesn\'t have that yet, so it\'s being added over time.</p>';
     document.getElementById("bballSeasonOverview").innerHTML = overviewHtml;
 
     document.getElementById("bballSeasonStandings").innerHTML =
@@ -4558,14 +4630,26 @@
   function bballSimulatePlayerStatLines(){
     var lines = [];
     var chemBonus = bballTeamChemistryBonus();
+    var spaceBonus = bballFloorSpacingBonus();
     BBALL_POSITIONS.forEach(function(pos){
       var slot = bball.slots[pos];
       if (!slot) return;
       var real = bballStatsFor(slot.player.name, slot.team, slot.era);
       if (!real) return;
-      var mult = 1 + bballNaturalPositionBonus(pos, slot) + chemBonus;
-      var ppg = bballVaryStat(real.ppg) * mult, rpg = bballVaryStat(real.rpg) * mult, apg = bballVaryStat(real.apg) * mult;
-      lines.push({ pos: pos, name: slot.player.name, team: slot.team, era: slot.era, ppg: ppg, rpg: rpg, apg: apg, combined: ppg + rpg + apg });
+      var mult = 1 + bballNaturalPositionBonus(pos, slot) + chemBonus + spaceBonus;
+      var line = {
+        pos: pos, name: slot.player.name, team: slot.team, era: slot.era,
+        ppg: bballVaryStat(real.ppg) * mult,
+        rpg: bballVaryStat(real.rpg) * mult,
+        apg: bballVaryStat(real.apg) * mult
+      };
+      if (real.spg != null) line.spg = bballVaryStat(real.spg) * mult;
+      if (real.bpg != null) line.bpg = bballVaryStat(real.bpg) * mult;
+      if (real.fgPct != null) line.fgPct = real.fgPct;
+      if (real.threePct != null) line.threePct = real.threePct;
+      if (real.ftPct != null) line.ftPct = real.ftPct;
+      line.combined = bballPlayerCombinedValue(line);
+      lines.push(line);
     });
     return lines;
   }
@@ -4579,20 +4663,35 @@
     if (!lines.length) return '<p class="chess-status">No stat lines available.</p>';
     var html = "";
     lines.forEach(function(l){
+      var sub = l.ppg.toFixed(1) + '/' + l.rpg.toFixed(1) + '/' + l.apg.toFixed(1);
+      if (l.spg != null && l.bpg != null) sub += ' · ' + l.spg.toFixed(1) + '-' + l.bpg.toFixed(1) + ' STL-BLK';
+      if (l.fgPct != null) sub += ' · ' + (l.fgPct*100).toFixed(1) + '% FG';
       html += '<div class="bball-stand-row"><div class="bball-stand-name">' + l.name + ' <span class="bball-stand-era">(' + l.pos + ')</span></div>'
-        + '<div class="bball-stand-record">' + l.ppg.toFixed(1) + '/' + l.rpg.toFixed(1) + '/' + l.apg.toFixed(1) + '</div></div>';
+        + '<div class="bball-stand-record">' + sub + '</div></div>';
     });
     return html;
   }
 
   // Regular-season awards: MVP goes to whichever of your five players simulates the best
-  // combined line; Coach of the Year is awarded only if your team finishes as the #1
-  // overall seed in the full 30-team league (not just your conference). DPOY isn't awarded
-  // yet — this player data set doesn't track steals or blocks, so there's no fair way to
-  // judge defense until that's added.
+  // combined line; Coach of the Year is awarded only if your team finishes as the #1 overall
+  // seed in the full 30-team league (not just your conference). DPOY goes to whichever of your
+  // five has the best defensive score (steals + blocks, weighted) — but only among players who
+  // actually have real steals/blocks on file. If none of your five have that data yet, DPOY is
+  // simply not awarded this season rather than guessing.
+  function bballBestDefensiveLine(lines){
+    var withData = lines.filter(function(l){ return l.spg != null && l.bpg != null; });
+    if (!withData.length) return null;
+    var best = withData[0], bestScore = withData[0].spg * 2 + withData[0].bpg * 2.5;
+    withData.forEach(function(l){
+      var score = l.spg * 2 + l.bpg * 2.5;
+      if (score > bestScore){ best = l; bestScore = score; }
+    });
+    return best;
+  }
   function bballComputeRegularSeasonAwards(season){
     var lines = bballSimulatePlayerStatLines();
     var mvp = bballBestPlayerLine(lines);
+    var dpoy = bballBestDefensiveLine(lines);
     var allSorted = BBALL_TEAMS.slice().sort(function(a,b){
       var wa = season.records[a].wins, wb = season.records[b].wins;
       if (wb !== wa) return wb - wa;
@@ -4601,8 +4700,9 @@
     var overallRank = allSorted.indexOf(season.userTeam) + 1;
     var awards = [];
     if (mvp) awards.push({ award:"MVP", player:mvp.name, detail: bballPlayerLineLabel(mvp) });
+    if (dpoy) awards.push({ award:"Defensive Player of the Year", player:dpoy.name, detail: dpoy.spg.toFixed(1) + " SPG/" + dpoy.bpg.toFixed(1) + " BPG" });
     if (overallRank === 1) awards.push({ award:"Coach of the Year", player:null, detail:"Best record in the league at " + season.userRecord.wins + "-" + season.userRecord.losses });
-    return { lines: lines, mvp: mvp, overallRank: overallRank, awards: awards };
+    return { lines: lines, mvp: mvp, dpoy: dpoy, overallRank: overallRank, awards: awards };
   }
 
   // Finals MVP only gets awarded when your team actually wins the title — we don't
@@ -4768,7 +4868,16 @@
     }
   }
   function bballPlayerLineLabel(line){
-    return line.name + " — " + line.ppg.toFixed(1) + "/" + line.rpg.toFixed(1) + "/" + line.apg.toFixed(1);
+    var base = line.name + " — " + line.ppg.toFixed(1) + "/" + line.rpg.toFixed(1) + "/" + line.apg.toFixed(1);
+    if (line.spg != null && line.bpg != null){
+      base += " · " + line.spg.toFixed(1) + " SPG/" + line.bpg.toFixed(1) + " BPG";
+    }
+    if (line.fgPct != null){
+      base += " · " + (line.fgPct*100).toFixed(1) + "% FG";
+      if (line.threePct != null) base += "/" + (line.threePct*100).toFixed(1) + "% 3PT";
+      if (line.ftPct != null) base += "/" + (line.ftPct*100).toFixed(1) + "% FT";
+    }
+    return base;
   }
   function bballUpdateBestPlayerSeason(lines){
     var best = bballBestPlayerLine(lines);
@@ -4878,6 +4987,37 @@
       select.appendChild(opt);
     });
   })();
+
+  // Populate the admin-only era/team jump-to dropdowns once.
+  (function(){
+    var eraSelect = document.getElementById("bballAdminEraSelect");
+    BBALL_ERAS.forEach(function(era){
+      var opt = document.createElement("option");
+      opt.value = era; opt.textContent = era;
+      eraSelect.appendChild(opt);
+    });
+    var teamSelect = document.getElementById("bballAdminTeamSelect");
+    BBALL_TEAMS.slice().sort().forEach(function(t){
+      var opt = document.createElement("option");
+      opt.value = t; opt.textContent = t;
+      teamSelect.appendChild(opt);
+    });
+  })();
+  document.getElementById("bballAdminEraSelect").addEventListener("change", function(e){
+    if (!e.target.value) return;
+    bball.era = e.target.value;
+    document.getElementById("bballEraValue").textContent = bball.era;
+    document.getElementById("bballSetupMsg").textContent = bball.era === "1960s"
+      ? "Decade not complete yet — Re-Spin Era."
+      : "";
+    bballUpdateBeginState();
+  });
+  document.getElementById("bballAdminTeamSelect").addEventListener("change", function(e){
+    if (!e.target.value) return;
+    bball.team = e.target.value;
+    document.getElementById("bballTeamValue").textContent = bball.team;
+    bballUpdateBeginState();
+  });
 
   bballLoadStats();
   openBballDraft();
