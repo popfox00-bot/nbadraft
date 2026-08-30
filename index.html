@@ -90,6 +90,8 @@
   .bball-eligible-player.selected{ background:var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
   .bball-pick-hint{ display:none; text-align:center; font-size:12.5px; font-weight:700; color:var(--accent); background:var(--accent-soft); border-radius:12px; padding:10px 14px; margin:10px 0; box-shadow: inset 0 0 0 1px var(--accent); }
   .bball-draft-banner{ background:var(--accent-soft); border-radius:14px; padding:14px 16px; margin-bottom:12px; box-shadow: inset 0 0 0 1.5px var(--accent); text-align:center; }
+  .bball-draft-banner.admin-editable{ cursor:pointer; }
+  .bball-draft-banner.admin-editable .bball-banner-main::after{ content:" ✎"; font-size:14px; opacity:0.7; }
   .bball-banner-eyebrow{ font-size:10.5px; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; color:var(--accent); margin-bottom:4px; }
   .bball-banner-main{ font-size:19px; font-weight:900; color:var(--ink); line-height:1.3; }
   .bball-banner-main b{ color:var(--accent); }
@@ -210,6 +212,15 @@
     <div id="bballDraft" style="display:none;">
       <div class="bball-sticky-head">
         <div class="bball-draft-banner" id="bballDraftBanner"></div>
+        <div id="bballDraftBannerEdit" style="display:none;">
+          <select id="bballBannerEraSelect" class="bball-team-select">
+            <option value="">Choose era…</option>
+          </select>
+          <select id="bballBannerTeamSelect" class="bball-team-select" style="margin-top:8px;">
+            <option value="">Choose team…</option>
+          </select>
+          <p class="chess-status" id="bballBannerEditMsg" style="margin-top:6px;"></p>
+        </div>
       </div>
 
       <div class="bball-roster" id="bballRoster"></div>
@@ -3725,7 +3736,9 @@
     document.getElementById("bballSpinEraBtn").disabled = false;
     document.getElementById("bballSpinTeamBtn").disabled = false;
     document.getElementById("bballAdminEraSelect").value = "";
+    document.getElementById("bballAdminEraSelect").selectedIndex = 0;
     document.getElementById("bballAdminTeamSelect").value = "";
+    document.getElementById("bballAdminTeamSelect").selectedIndex = 0;
     bballRefreshAdminControlsVisibility();
 
     var savedFavorite = null;
@@ -3747,6 +3760,10 @@
     try{ localStorage.setItem(FAVORITE_TEAM_KEY, bball.favoriteTeam); }catch(e){}
     document.getElementById("bballFavoriteSetup").style.display = "none";
     document.getElementById("bballSetup").style.display = "block";
+    // Re-sync admin dropdown visibility every time this screen opens — covers the case where
+    // admin mode was unlocked while a stale visibility state was left over from an earlier
+    // screen, rather than relying solely on openBballDraft() having run recently.
+    bballRefreshAdminControlsVisibility();
   }
 
   // Era spins are capped at one initial spin + one free re-spin, then the button locks —
@@ -3823,10 +3840,63 @@
 
   function updateBballDraftHeader(){
     var note = BBALL_NOTES[bball.era + "|" + bball.team];
-    document.getElementById("bballDraftBanner").innerHTML =
+    var banner = document.getElementById("bballDraftBanner");
+    banner.innerHTML =
       '<div class="bball-banner-eyebrow">Now Drafting From</div>'
       + '<div class="bball-banner-main"><b>' + bball.team + '</b> — <b>' + bball.era + '</b></div>'
       + (note ? ('<div class="bball-banner-note">' + note + '</div>') : '');
+    banner.classList.toggle("admin-editable", bballAdminUnlocked);
+  }
+
+  // Admin-only: tapping the frozen "Now Drafting From" banner mid-draft reveals a pair of
+  // dropdowns to change which historical roster new candidates are pulled from. This is safe
+  // at any point — each already-drafted player carries their own {team, era} independent of
+  // whatever roster is "currently being pulled from," so switching sources never disturbs
+  // slots that are already filled, only which players show up next in the eligible pool.
+  function bballToggleBannerEdit(){
+    if (!bballAdminUnlocked) return;
+    var editEl = document.getElementById("bballDraftBannerEdit");
+    var opening = editEl.style.display === "none";
+    editEl.style.display = opening ? "block" : "none";
+    if (opening){
+      document.getElementById("bballBannerEraSelect").value = bball.era;
+      document.getElementById("bballBannerTeamSelect").value = bball.team;
+      document.getElementById("bballBannerEditMsg").textContent = "";
+    }
+  }
+
+  function bballApplyBannerRosterChange(){
+    var newEra = document.getElementById("bballBannerEraSelect").value;
+    var newTeam = document.getElementById("bballBannerTeamSelect").value;
+    if (!newEra || !newTeam) return;
+    var msgEl = document.getElementById("bballBannerEditMsg");
+    if (newEra === "1960s"){
+      msgEl.textContent = "Decade not complete yet — pick a different era.";
+      return;
+    }
+    var eraData = BBALL_ROSTERS[newEra];
+    var roster = eraData ? eraData[newTeam] : null;
+    if (!roster){
+      msgEl.textContent = "No roster data yet for the " + newTeam + " in " + newEra + ".";
+      return;
+    }
+    bball.era = newEra;
+    bball.team = newTeam;
+    // Rebuild the pool from the new roster, excluding anyone already sitting in a slot
+    // (drafted from any source) so the same real person can't be offered twice.
+    var draftedNames = {};
+    BBALL_POSITIONS.forEach(function(pos){
+      if (bball.slots[pos]) draftedNames[bball.slots[pos].player.name] = true;
+    });
+    bball.pool = roster.filter(function(p){ return !draftedNames[p.name]; });
+    bball.candidate = null;
+    bball.respinsSinceLastPick = 0;
+    msgEl.textContent = "Now pulling new candidates from " + newTeam + " — " + newEra + ".";
+    updateBballDraftHeader();
+    renderBballEligibleList();
+    renderBballRoster();
+    updateBballRespinButtonState();
+    updateBballPickHint();
   }
 
   // Reflects how many "free" re-spins (without locking in a player) are left this round.
@@ -5003,7 +5073,7 @@
       teamSelect.appendChild(opt);
     });
   })();
-  document.getElementById("bballAdminEraSelect").addEventListener("change", function(e){
+  function bballAdminEraSelectHandler(e){
     if (!e.target.value) return;
     bball.era = e.target.value;
     document.getElementById("bballEraValue").textContent = bball.era;
@@ -5011,13 +5081,43 @@
       ? "Decade not complete yet — Re-Spin Era."
       : "";
     bballUpdateBeginState();
-  });
-  document.getElementById("bballAdminTeamSelect").addEventListener("change", function(e){
+  }
+  function bballAdminTeamSelectHandler(e){
     if (!e.target.value) return;
     bball.team = e.target.value;
     document.getElementById("bballTeamValue").textContent = bball.team;
     bballUpdateBeginState();
-  });
+  }
+  // Both "change" and "input" are wired for the admin dropdowns — some mobile browsers/WebViews
+  // are inconsistent about firing "change" reliably for native <select> elements, especially
+  // after the surrounding container has been toggled via display:none/block between screens.
+  // Attaching the same named function to both events is safe (no double side effects, since
+  // each handler call is idempotent) and meaningfully more robust across environments.
+  document.getElementById("bballAdminEraSelect").addEventListener("change", bballAdminEraSelectHandler);
+  document.getElementById("bballAdminEraSelect").addEventListener("input", bballAdminEraSelectHandler);
+  document.getElementById("bballAdminTeamSelect").addEventListener("change", bballAdminTeamSelectHandler);
+  document.getElementById("bballAdminTeamSelect").addEventListener("input", bballAdminTeamSelectHandler);
+
+  // Populate the banner-edit dropdowns (mid-draft roster-source switcher) the same way.
+  (function(){
+    var eraSelect = document.getElementById("bballBannerEraSelect");
+    BBALL_ERAS.forEach(function(era){
+      var opt = document.createElement("option");
+      opt.value = era; opt.textContent = era;
+      eraSelect.appendChild(opt);
+    });
+    var teamSelect = document.getElementById("bballBannerTeamSelect");
+    BBALL_TEAMS.slice().sort().forEach(function(t){
+      var opt = document.createElement("option");
+      opt.value = t; opt.textContent = t;
+      teamSelect.appendChild(opt);
+    });
+  })();
+  document.getElementById("bballDraftBanner").addEventListener("click", bballToggleBannerEdit);
+  document.getElementById("bballBannerEraSelect").addEventListener("change", bballApplyBannerRosterChange);
+  document.getElementById("bballBannerEraSelect").addEventListener("input", bballApplyBannerRosterChange);
+  document.getElementById("bballBannerTeamSelect").addEventListener("change", bballApplyBannerRosterChange);
+  document.getElementById("bballBannerTeamSelect").addEventListener("input", bballApplyBannerRosterChange);
 
   bballLoadStats();
   openBballDraft();
