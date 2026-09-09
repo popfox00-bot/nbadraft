@@ -158,6 +158,20 @@
   .bball-stat-card-label{ font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.06em; font-weight:700; }
   .bball-stat-card-value{ font-size:22px; font-weight:800; color:var(--accent); margin-top:6px; }
   .bball-stat-card-sub{ font-size:12.5px; color:var(--ink-soft); margin-top:4px; line-height:1.5; }
+  .bball-record-details{ max-width:420px; margin:-6px auto 14px; }
+  .bball-record-details summary{ font-size:12px; font-weight:700; color:var(--accent); cursor:pointer; padding:6px 4px 10px; list-style:none; text-align:center; }
+  .bball-record-details summary::-webkit-details-marker{ display:none; }
+  .bball-record-details .bball-slot{ margin-bottom:6px; }
+  .bball-record-toggle{ display:flex; gap:6px; margin:10px 0 8px; background:var(--panel); border-radius:12px; padding:4px; }
+  .bball-record-tab{ flex:1; border:none; background:none; padding:9px 0; border-radius:9px; font-size:12px; font-weight:700; color:var(--ink-soft); cursor:pointer; }
+  .bball-record-tab.active{ background:var(--accent); color:#fff; }
+  .bball-settings-label{ max-width:420px; margin:0 auto 8px; font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.06em; font-weight:700; }
+  .bball-appearance-row{ max-width:420px; margin:0 auto 16px; display:flex; gap:6px; background:var(--panel); border-radius:12px; padding:4px; }
+  .bball-appearance-btn{ flex:1; border:none; background:none; padding:10px 0; border-radius:9px; font-size:13px; font-weight:700; color:var(--ink-soft); cursor:pointer; }
+  .bball-appearance-btn.active{ background:var(--accent); color:#fff; }
+  .bball-custom-color-row{ max-width:420px; margin:0 auto; background:var(--panel); border-radius:16px; padding:16px; box-shadow: inset 0 0 0 1px var(--rule); }
+  .bball-custom-color-row label{ font-size:13px; font-weight:700; color:var(--ink); display:block; margin-bottom:10px; }
+  .bball-custom-color-row input[type="color"]{ width:100%; height:44px; border:none; border-radius:10px; background:var(--panel-hi); cursor:pointer; padding:4px; }
 </style>
 </head>
 <body>
@@ -174,6 +188,9 @@
         </button>
         <button class="icon-btn" id="themeToggleBtn" aria-label="Toggle theme">
           <svg id="themeIcon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+        </button>
+        <button class="icon-btn" id="bballSettingsBtn" aria-label="Settings">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
         </button>
       </div>
     </div>
@@ -299,6 +316,29 @@
   <div id="bballStatsBody"></div>
 </div>
 
+<div id="bballSettingsPage" class="bball-stats-overlay" style="display:none;">
+  <div class="top-bar">
+    <div>
+      <p class="eyebrow">Preferences</p>
+      <h1>Settings</h1>
+    </div>
+    <button class="icon-btn" id="bballSettingsCloseBtn" aria-label="Close">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+    </button>
+  </div>
+  <p class="bball-settings-label">Appearance</p>
+  <div class="bball-appearance-row" id="bballAppearanceRow">
+    <button class="bball-appearance-btn" data-mode="light">Light</button>
+    <button class="bball-appearance-btn" data-mode="dark">Dark</button>
+    <button class="bball-appearance-btn" data-mode="custom">Custom</button>
+  </div>
+  <div class="bball-custom-color-row" id="bballCustomColorRow" style="display:none;">
+    <label for="bballCustomColorInput">Background color</label>
+    <input type="color" id="bballCustomColorInput" value="#E2793D">
+    <p class="chess-status" style="margin-top:10px; margin-bottom:0;">Builds a full palette — background, panels, and accent — around this color, checked for readable contrast.</p>
+  </div>
+</div>
+
 <script>
   // ================= THEME =================
   var THEME_KEY = "basketballDraftTheme";
@@ -311,7 +351,134 @@
   }
   function setTheme(theme){
     try{ localStorage.setItem(THEME_KEY, theme); }catch(e){}
+    clearCustomThemeOverrides();
     applyTheme(theme);
+  }
+
+  // ================= CUSTOM THEME (background color customization) =================
+  var CUSTOM_KEY = "basketballDraftCustomColor";
+  function bballHexToRgb(hex){
+    hex = hex.replace('#','');
+    if (hex.length === 3) hex = hex.split('').map(function(c){ return c+c; }).join('');
+    var num = parseInt(hex, 16);
+    return { r:(num>>16)&255, g:(num>>8)&255, b:num&255 };
+  }
+  function bballRgbToHex(r,g,b){
+    function h(v){ v = Math.max(0, Math.min(255, Math.round(v))); var s = v.toString(16); return s.length===1 ? '0'+s : s; }
+    return '#'+h(r)+h(g)+h(b);
+  }
+  function bballRgbToHsl(r,g,b){
+    r/=255; g/=255; b/=255;
+    var max=Math.max(r,g,b), min=Math.min(r,g,b), h,s,l=(max+min)/2;
+    if (max===min){ h=s=0; }
+    else{
+      var d=max-min;
+      s = l>0.5 ? d/(2-max-min) : d/(max+min);
+      if (max===r) h=(g-b)/d+(g<b?6:0);
+      else if (max===g) h=(b-r)/d+2;
+      else h=(r-g)/d+4;
+      h/=6;
+    }
+    return { h:h*360, s:s*100, l:l*100 };
+  }
+  function bballHslToRgb(h,s,l){
+    h/=360; s/=100; l/=100;
+    var r,g,b;
+    if (s===0){ r=g=b=l; }
+    else{
+      function hue2rgb(p,q,t){
+        if (t<0) t+=1; if (t>1) t-=1;
+        if (t<1/6) return p+(q-p)*6*t;
+        if (t<1/2) return q;
+        if (t<2/3) return p+(q-p)*(2/3-t)*6;
+        return p;
+      }
+      var q = l<0.5 ? l*(1+s) : l+s-l*s;
+      var p = 2*l-q;
+      r = hue2rgb(p,q,h+1/3); g = hue2rgb(p,q,h); b = hue2rgb(p,q,h-1/3);
+    }
+    return { r:r*255, g:g*255, b:b*255 };
+  }
+  function bballHslToHex(h,s,l){ var rgb = bballHslToRgb(h,s,l); return bballRgbToHex(rgb.r, rgb.g, rgb.b); }
+  function bballRelLuminance(hex){
+    var rgb = bballHexToRgb(hex);
+    function chan(v){ v/=255; return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); }
+    return 0.2126*chan(rgb.r) + 0.7152*chan(rgb.g) + 0.0722*chan(rgb.b);
+  }
+  function bballContrastRatio(hex1, hex2){
+    var l1 = bballRelLuminance(hex1), l2 = bballRelLuminance(hex2);
+    var lighter = Math.max(l1,l2), darker = Math.min(l1,l2);
+    return (lighter+0.05)/(darker+0.05);
+  }
+  // Per-hue lightness search: starting from startL, steps toward the appropriate
+  // extreme (light theme -> brighter, dark theme -> darker) until contrast against
+  // inkHex clears minContrast. Falls back to the extreme if nothing clears it.
+  function bballFindLightness(h, s, isLight, inkHex, minContrast, startL){
+    var l = startL != null ? startL : 50;
+    var step = isLight ? 2 : -2;
+    var limit = isLight ? 97 : 6;
+    for (var i=0; i<40; i++){
+      var hex = bballHslToHex(h,s,l);
+      if (bballContrastRatio(hex, inkHex) >= minContrast) return { hex:hex, l:l };
+      if ((isLight && l>=limit) || (!isLight && l<=limit)) break;
+      l += step;
+    }
+    return { hex: bballHslToHex(h,s,limit), l:limit };
+  }
+  function clearCustomThemeOverrides(){
+    var root = document.documentElement.style;
+    ["--bg","--panel","--panel-hi","--ink","--ink-soft","--accent","--accent-soft","--rule"].forEach(function(p){ root.removeProperty(p); });
+  }
+  function applyCustomTheme(pickedHex){
+    var rgb = bballHexToRgb(pickedHex);
+    var hsl = bballRgbToHsl(rgb.r, rgb.g, rgb.b);
+    var isLight = hsl.l >= 50;
+    var h = hsl.h;
+    var s = Math.min(hsl.s, 40);
+    var inkHex = isLight ? "#232323" : "#EDEEF2";
+    var inkSoftHex = isLight ? "#7A756B" : "#8B93A7";
+
+    var bgR = bballFindLightness(h, s, isLight, inkHex, 4.5, 50);
+    var panelR = bballFindLightness(h, s, isLight, inkHex, 4.5, bgR.l + (isLight ? 4 : 3));
+    var panelHiR = bballFindLightness(h, s, isLight, inkHex, 4.5, panelR.l + (isLight ? -3 : 3));
+
+    // Accent always pairs with white button text, so its lightness is picked to keep
+    // that white text readable (>=4.5:1) rather than tied to light/dark mode.
+    var accentS = Math.min(Math.max(hsl.s, 45), 70);
+    var accentL = 50;
+    for (var i=0; i<25 && bballContrastRatio(bballHslToHex(h, accentS, accentL), "#FFFFFF") < 4.5; i++){ accentL -= 2; }
+    if (accentL < 20) accentL = 20;
+    var accentHex = bballHslToHex(h, accentS, accentL);
+    var accentSoftHex = bballHslToHex(h, Math.min(s, 25), isLight ? Math.min(panelR.l + 8, 96) : Math.max(panelR.l - 10, 10));
+
+    var root = document.documentElement.style;
+    root.setProperty("--bg", bgR.hex);
+    root.setProperty("--panel", panelR.hex);
+    root.setProperty("--panel-hi", panelHiR.hex);
+    root.setProperty("--ink", inkHex);
+    root.setProperty("--ink-soft", inkSoftHex);
+    root.setProperty("--accent", accentHex);
+    root.setProperty("--accent-soft", accentSoftHex);
+    root.setProperty("--rule", isLight ? "rgba(35,35,35,0.09)" : "rgba(237,238,242,0.08)");
+
+    document.documentElement.setAttribute("data-theme", "custom");
+    document.getElementById("themeIcon").innerHTML = isLight ? SUN_PATH : MOON_PATH;
+    document.querySelector('meta[name="theme-color"]').setAttribute("content", bgR.hex);
+  }
+  function setThemeMode(mode, customHex){
+    try{
+      localStorage.setItem(THEME_KEY, mode);
+      if (mode === "custom" && customHex) localStorage.setItem(CUSTOM_KEY, customHex);
+    }catch(e){}
+    if (mode === "custom" && customHex){ applyCustomTheme(customHex); }
+    else { clearCustomThemeOverrides(); applyTheme(mode); }
+  }
+  function bballRefreshAppearanceButtons(){
+    var mode = document.documentElement.getAttribute("data-theme") || "dark";
+    document.querySelectorAll(".bball-appearance-btn").forEach(function(b){
+      b.classList.toggle("active", b.dataset.mode === mode);
+    });
+    document.getElementById("bballCustomColorRow").style.display = mode === "custom" ? "block" : "none";
   }
 
   // ---- Hidden admin unlock sequence ----
@@ -349,8 +516,40 @@
   (function(){
     var saved = "dark";
     try{ saved = localStorage.getItem(THEME_KEY) || "dark"; }catch(e){}
-    applyTheme(saved);
+    if (saved === "custom"){
+      var customHex = null;
+      try{ customHex = localStorage.getItem(CUSTOM_KEY); }catch(e){}
+      if (customHex) applyCustomTheme(customHex); else applyTheme("dark");
+    } else {
+      applyTheme(saved);
+    }
   })();
+
+  document.getElementById("bballSettingsBtn").addEventListener("click", function(){
+    bballRefreshAppearanceButtons();
+    var storedCustom = null;
+    try{ storedCustom = localStorage.getItem(CUSTOM_KEY); }catch(e){}
+    document.getElementById("bballCustomColorInput").value = storedCustom || "#E2793D";
+    document.getElementById("bballSettingsPage").style.display = "block";
+  });
+  document.getElementById("bballSettingsCloseBtn").addEventListener("click", function(){
+    document.getElementById("bballSettingsPage").style.display = "none";
+  });
+  document.querySelectorAll(".bball-appearance-btn").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var mode = btn.dataset.mode;
+      if (mode === "custom"){
+        setThemeMode("custom", document.getElementById("bballCustomColorInput").value);
+      } else {
+        setThemeMode(mode);
+      }
+      bballRefreshAppearanceButtons();
+    });
+  });
+  document.getElementById("bballCustomColorInput").addEventListener("input", function(){
+    setThemeMode("custom", this.value);
+    bballRefreshAppearanceButtons();
+  });
 
 </script>
 <script>
@@ -2719,50 +2918,50 @@
     "Terry Cummings|Los Angeles C|1980s": { ppg:23.7, rpg:10.6, apg:2.5, spg:1.8, bpg:0.9, fgPct:0.523, ftPct:0.709, season:"1982-83" },
 
     // Los Angeles Clippers — 1990s (from the 1992-93 playoff team)
-    "Mark Jackson|Los Angeles C|1990s": { ppg:14.4, rpg:4.7, apg:8.8, season:"1992-93" },
-    "Ron Harper|Los Angeles C|1990s": { ppg:18.0, rpg:5.3, apg:4.5, season:"1992-93" },
-    "Danny Manning|Los Angeles C|1990s": { ppg:22.8, rpg:6.6, apg:2.6, season:"1992-93" },
-    "Loy Vaught|Los Angeles C|1990s": { ppg:9.4, rpg:6.2, apg:0.7, season:"1992-93" },
-    "Pooh Richardson|Los Angeles C|1990s": { ppg:11.7, rpg:2.5, apg:5.4, season:"1995-96" },
-    "Rodney Rogers|Los Angeles C|1990s": { ppg:11.6, rpg:4.3, apg:2.5, season:"1995-96" },
-    "Malik Sealy|Los Angeles C|1990s": { ppg:11.5, rpg:3.9, apg:1.9, season:"1995-96" },
-    "Lamond Murray|Los Angeles C|1990s": { ppg:8.4, rpg:3.2, apg:1.1, season:"1995-96" }
+    "Mark Jackson|Los Angeles C|1990s": { ppg:14.4, rpg:4.7, apg:8.8, spg:1.7, bpg:0.1, fgPct:0.486, ftPct:0.803, season:"1992-93" },
+    "Ron Harper|Los Angeles C|1990s": { ppg:18.0, rpg:5.3, apg:4.5, spg:2.2, bpg:0.9, fgPct:0.451, ftPct:0.769, season:"1992-93" },
+    "Danny Manning|Los Angeles C|1990s": { ppg:22.8, rpg:6.6, apg:2.6, spg:1.4, bpg:1.3, fgPct:0.509, ftPct:0.802, season:"1992-93" },
+    "Loy Vaught|Los Angeles C|1990s": { ppg:9.4, rpg:6.2, apg:0.7, spg:0.7, bpg:0.5, fgPct:0.508, ftPct:0.748, season:"1992-93" },
+    "Pooh Richardson|Los Angeles C|1990s": { ppg:11.7, rpg:2.5, apg:5.4, spg:1.2, bpg:0.2, fgPct:0.423, ftPct:0.743, season:"1995-96" },
+    "Rodney Rogers|Los Angeles C|1990s": { ppg:11.6, rpg:4.3, apg:2.5, spg:1.1, bpg:0.5, fgPct:0.477, ftPct:0.628, season:"1995-96" },
+    "Malik Sealy|Los Angeles C|1990s": { ppg:11.5, rpg:3.9, apg:1.9, spg:1.4, bpg:0.5, fgPct:0.415, ftPct:0.799, season:"1995-96" },
+    "Lamond Murray|Los Angeles C|1990s": { ppg:8.4, rpg:3.2, apg:1.1, spg:0.8, bpg:0.3, fgPct:0.447, ftPct:0.750, season:"1995-96" }
   };
 
   // Los Angeles Clippers — 2000s (from the 2005-06 47-35 playoff team, franchise's best in decades)
   const BBALL_STATS_LAC2000S = {
-    "Elton Brand|Los Angeles C|2000s": { ppg:24.7, rpg:10.0, apg:2.6, season:"2005-06" },
-    "Sam Cassell|Los Angeles C|2000s": { ppg:17.2, rpg:3.7, apg:6.3, season:"2005-06" },
-    "Cuttino Mobley|Los Angeles C|2000s": { ppg:14.8, rpg:4.3, apg:3.0, season:"2005-06" },
-    "Chris Kaman|Los Angeles C|2000s": { ppg:11.9, rpg:9.6, apg:1.0, season:"2005-06" },
-    "Corey Maggette|Los Angeles C|2000s": { ppg:17.8, rpg:5.3, apg:2.1, season:"2005-06" },
-    "Shaun Livingston|Los Angeles C|2000s": { ppg:5.8, rpg:3.0, apg:4.5, season:"2005-06" },
-    "Quentin Richardson|Los Angeles C|2000s": { ppg:17.2, rpg:6.4, apg:2.1, season:"2003-04" }
+    "Elton Brand|Los Angeles C|2000s": { ppg:24.7, rpg:10.0, apg:2.6, spg:1.0, bpg:2.5, fgPct:0.527, ftPct:0.775, season:"2005-06" },
+    "Sam Cassell|Los Angeles C|2000s": { ppg:17.2, rpg:3.7, apg:6.3, spg:0.9, bpg:0.1, fgPct:0.443, ftPct:0.863, season:"2005-06" },
+    "Cuttino Mobley|Los Angeles C|2000s": { ppg:14.8, rpg:4.3, apg:3.0, spg:1.2, bpg:0.5, fgPct:0.426, ftPct:0.839, season:"2005-06" },
+    "Chris Kaman|Los Angeles C|2000s": { ppg:11.9, rpg:9.6, apg:1.0, spg:0.6, bpg:1.4, fgPct:0.523, ftPct:0.770, season:"2005-06" },
+    "Corey Maggette|Los Angeles C|2000s": { ppg:17.8, rpg:5.3, apg:2.1, spg:0.6, bpg:0.1, fgPct:0.445, ftPct:0.828, season:"2005-06" },
+    "Shaun Livingston|Los Angeles C|2000s": { ppg:5.8, rpg:3.0, apg:4.5, spg:0.8, bpg:0.5, fgPct:0.427, ftPct:0.688, season:"2005-06" },
+    "Quentin Richardson|Los Angeles C|2000s": { ppg:17.2, rpg:6.4, apg:2.1, spg:1.0, bpg:0.3, fgPct:0.398, ftPct:0.740, season:"2003-04" }
   };
   Object.assign(BBALL_STATS, BBALL_STATS_LAC2000S);
 
   // Los Angeles Clippers — 2010s (from the 2015-16 53-29 Lob City team)
   const BBALL_STATS_LAC2010S = {
-    "Chris Paul|Los Angeles C|2010s": { ppg:19.5, rpg:4.2, apg:10.0, season:"2015-16" },
-    "Blake Griffin|Los Angeles C|2010s": { ppg:21.4, rpg:8.4, apg:4.9, season:"2015-16" },
-    "DeAndre Jordan|Los Angeles C|2010s": { ppg:12.7, rpg:13.8, apg:1.2, season:"2015-16" },
-    "J.J. Redick|Los Angeles C|2010s": { ppg:16.3, rpg:1.9, apg:1.4, season:"2015-16" },
-    "Jamal Crawford|Los Angeles C|2010s": { ppg:14.2, rpg:1.8, apg:2.3, season:"2015-16" },
-    "Paul Pierce|Los Angeles C|2010s": { ppg:6.1, rpg:2.7, apg:1.0, season:"2015-16" },
-    "Austin Rivers|Los Angeles C|2010s": { ppg:8.9, rpg:1.9, apg:1.5, season:"2015-16" },
-    "Danilo Gallinari|Los Angeles C|2010s": { ppg:19.8, rpg:6.1, apg:2.6, season:"2018-19" }
+    "Chris Paul|Los Angeles C|2010s": { ppg:19.5, rpg:4.2, apg:10.0, spg:2.1, bpg:0.2, fgPct:0.462, ftPct:0.896, season:"2015-16" },
+    "Blake Griffin|Los Angeles C|2010s": { ppg:21.4, rpg:8.4, apg:4.9, spg:0.8, bpg:0.5, fgPct:0.499, ftPct:0.727, season:"2015-16" },
+    "DeAndre Jordan|Los Angeles C|2010s": { ppg:12.7, rpg:13.8, apg:1.2, spg:0.7, bpg:2.3, fgPct:0.703, ftPct:0.430, season:"2015-16" },
+    "J.J. Redick|Los Angeles C|2010s": { ppg:16.3, rpg:1.9, apg:1.4, spg:0.6, bpg:0.1, fgPct:0.480, ftPct:0.888, season:"2015-16" },
+    "Jamal Crawford|Los Angeles C|2010s": { ppg:14.2, rpg:1.8, apg:2.3, spg:0.7, bpg:0.2, fgPct:0.404, ftPct:0.904, season:"2015-16" },
+    "Paul Pierce|Los Angeles C|2010s": { ppg:6.1, rpg:2.7, apg:1.0, spg:0.5, bpg:0.3, fgPct:0.363, ftPct:0.818, season:"2015-16" },
+    "Austin Rivers|Los Angeles C|2010s": { ppg:8.9, rpg:1.9, apg:1.5, spg:0.7, bpg:0.1, fgPct:0.438, ftPct:0.681, season:"2015-16" },
+    "Danilo Gallinari|Los Angeles C|2010s": { ppg:19.8, rpg:6.1, apg:2.6, spg:0.7, bpg:0.3, fgPct:0.463, ftPct:0.904, season:"2018-19" }
   };
   Object.assign(BBALL_STATS, BBALL_STATS_LAC2010S);
 
   // Los Angeles Clippers — 2020s (from the 2020-21 47-25 conference finals team)
   const BBALL_STATS_LAC2020S = {
-    "Kawhi Leonard|Los Angeles C|2020s": { ppg:24.8, rpg:6.5, apg:5.2, season:"2020-21" },
-    "Paul George|Los Angeles C|2020s": { ppg:23.3, rpg:6.6, apg:5.2, season:"2020-21" },
-    "Marcus Morris|Los Angeles C|2020s": { ppg:13.4, rpg:4.1, apg:1.0, season:"2020-21" },
-    "Reggie Jackson|Los Angeles C|2020s": { ppg:10.7, rpg:2.9, apg:3.1, season:"2020-21" },
-    "Ivica Zubac|Los Angeles C|2020s": { ppg:9.0, rpg:7.2, apg:1.3, season:"2020-21" },
-    "Terance Mann|Los Angeles C|2020s": { ppg:7.0, rpg:3.6, apg:1.6, season:"2020-21" },
-    "James Harden|Los Angeles C|2020s": { ppg:22.8, rpg:5.8, apg:8.7, season:"2024-25" }
+    "Kawhi Leonard|Los Angeles C|2020s": { ppg:24.8, rpg:6.5, apg:5.2, spg:1.6, bpg:0.4, fgPct:0.512, ftPct:0.885, season:"2020-21" },
+    "Paul George|Los Angeles C|2020s": { ppg:23.3, rpg:6.6, apg:5.2, spg:1.1, bpg:0.4, fgPct:0.467, ftPct:0.868, season:"2020-21" },
+    "Marcus Morris|Los Angeles C|2020s": { ppg:13.4, rpg:4.1, apg:1.0, spg:0.6, bpg:0.3, fgPct:0.473, ftPct:0.820, season:"2020-21" },
+    "Reggie Jackson|Los Angeles C|2020s": { ppg:10.7, rpg:2.9, apg:3.1, spg:0.6, bpg:0.1, fgPct:0.450, ftPct:0.817, season:"2020-21" },
+    "Ivica Zubac|Los Angeles C|2020s": { ppg:9.0, rpg:7.2, apg:1.3, spg:0.3, bpg:0.9, fgPct:0.652, ftPct:0.789, season:"2020-21" },
+    "Terance Mann|Los Angeles C|2020s": { ppg:7.0, rpg:3.6, apg:1.6, spg:0.4, bpg:0.2, fgPct:0.509, ftPct:0.830, season:"2020-21" },
+    "James Harden|Los Angeles C|2020s": { ppg:22.8, rpg:5.8, apg:8.7, spg:1.5, bpg:0.7, fgPct:0.410, ftPct:0.874, season:"2024-25" }
   };
   Object.assign(BBALL_STATS, BBALL_STATS_LAC2020S);
 
@@ -4290,7 +4489,7 @@
       '<div class="bball-grade-letter">' + grade.grade + '</div>'
       + '<div class="bball-grade-label">' + grade.label + '</div>'
       + '<div class="bball-grade-detail">' + grade.blurb + '</div>';
-    bballUpdateGradeStats(grade);
+    bballUpdateGradeStats(grade, bballCurrentLineupSnapshot());
   }
 
   // ================= SEASON SIMULATOR =================
@@ -4730,6 +4929,49 @@
     lines.forEach(function(l){ if (l.combined > best.combined) best = l; });
     return best;
   }
+  // ---- Record dropdowns: full drafted lineup + season/playoff stat lines ----
+  function bballCurrentLineupSnapshot(){
+    var lineup = [];
+    BBALL_POSITIONS.forEach(function(pos){
+      var slot = bball.slots[pos];
+      if (slot) lineup.push({ pos:pos, name:slot.player.name, team:slot.team, era:slot.era });
+    });
+    return lineup;
+  }
+  function bballLineupRowsHtml(lineup){
+    if (!lineup || !lineup.length) return '<p class="chess-status">No lineup on file.</p>';
+    var html = "";
+    lineup.forEach(function(p){
+      var statsLine = bballStatsFor(p.name, p.team, p.era);
+      var sub = p.team + ' — ' + p.era;
+      if (statsLine) sub += ' · ' + statsLine.ppg.toFixed(1) + '/' + statsLine.rpg.toFixed(1) + '/' + statsLine.apg.toFixed(1);
+      html += '<div class="bball-slot filled"><div class="bball-slot-pos">' + p.pos + '</div><div><div class="bball-slot-name">' + p.name + '</div><div class="bball-slot-sub">' + sub + '</div></div></div>';
+    });
+    return html;
+  }
+  // key must be unique per record card (e.g. "grade", "season", "playoff") — it scopes
+  // the Regular Season / Playoffs toggle so multiple dropdowns on the same page don't
+  // cross-wire each other's panels.
+  function bballRecordDropdownHtml(key, lineup, regLines, playoffLines){
+    if (!lineup || !lineup.length) return "";
+    var html = '<details class="bball-record-details"><summary>View team &amp; stats</summary>';
+    html += bballLineupRowsHtml(lineup);
+    if (regLines && regLines.length){
+      var hasPlayoff = playoffLines && playoffLines.length;
+      if (hasPlayoff){
+        html += '<div class="bball-record-toggle" data-record="' + key + '">'
+          + '<button class="bball-record-tab active" data-view="reg">Regular Season</button>'
+          + '<button class="bball-record-tab" data-view="po">Playoffs</button>'
+          + '</div>';
+      }
+      html += '<div class="bball-record-lines" data-record="' + key + '" data-view="reg">' + bballPlayerStatRowsHtml(regLines) + '</div>';
+      if (hasPlayoff){
+        html += '<div class="bball-record-lines" data-record="' + key + '" data-view="po" style="display:none;">' + bballPlayerStatRowsHtml(playoffLines) + '</div>';
+      }
+    }
+    html += '</details>';
+    return html;
+  }
   function bballPlayerStatRowsHtml(lines){
     if (!lines.length) return '<p class="chess-status">No stat lines available.</p>';
     var html = "";
@@ -4821,7 +5063,6 @@
     bballRunProgressBar("bballSeasonProgressFill", 2200, function(){
       bballLastSeasonResult = bballSimulateRegularSeasonPhase();
       bballLastPlayoffResult = null;
-      bballUpdateSeasonStats(bballLastSeasonResult.userRecord.wins, bballLastSeasonResult.userRecord.losses);
 
       var regAwards = bballComputeRegularSeasonAwards(bballLastSeasonResult);
       bballLastSeasonResult.playerLines = regAwards.lines;
@@ -4829,6 +5070,7 @@
       bballLastSeasonResult.overallRank = regAwards.overallRank;
       bballLastSeasonResult.awards = regAwards.awards;
       bballCurrentSeasonAwards = regAwards.awards.slice();
+      bballUpdateSeasonStats(bballLastSeasonResult.userRecord.wins, bballLastSeasonResult.userRecord.losses, bballCurrentLineupSnapshot(), regAwards.lines);
       bballUpdateBestPlayerSeason(regAwards.lines);
       bballAddAwardsTally(regAwards.awards.length);
       bballUpdateBestAwardsSeason(bballCurrentSeasonAwards);
@@ -4848,13 +5090,13 @@
     document.getElementById("bballPlayoffLoading").style.display = "block";
     bballRunProgressBar("bballPlayoffProgressFill", 2200, function(){
       bballLastPlayoffResult = bballSimulatePlayoffsPhase(bballLastSeasonResult);
-      bballUpdatePlayoffStats(bballLastPlayoffResult.userRank);
 
       var poAwards = bballComputePlayoffAwards(bballLastSeasonResult, bballLastPlayoffResult);
       bballLastPlayoffResult.playerLines = poAwards.lines;
       bballLastPlayoffResult.finalsMVP = poAwards.finalsMVP;
       bballLastPlayoffResult.awards = poAwards.awards;
       bballCurrentSeasonAwards = bballCurrentSeasonAwards.concat(poAwards.awards);
+      bballUpdatePlayoffStats(bballLastPlayoffResult.userRank, bballCurrentLineupSnapshot(), bballLastSeasonResult.playerLines, poAwards.lines);
       if (poAwards.lines.length) bballUpdateBestPlayoffPlayerSeason(poAwards.lines);
       bballAddAwardsTally(poAwards.awards.length);
       bballUpdateBestAwardsSeason(bballCurrentSeasonAwards);
@@ -4878,13 +5120,19 @@
     bestGradeIdx:null, bestGradeText:null, bestPRA:null, bestSeasonWins:null, bestSeasonRecord:null, bestPlayoffRank:null, bestPlayoffText:null,
     bestPlayerSeasonScore:null, bestPlayerSeasonText:null,
     bestPlayoffPlayerScore:null, bestPlayoffPlayerText:null,
-    totalAwardsWon:0, bestAwardsSeasonCount:null, bestAwardsSeasonText:null
+    totalAwardsWon:0, bestAwardsSeasonCount:null, bestAwardsSeasonText:null,
+    bestGradeLineup:null,
+    bestSeasonLineup:null, bestSeasonRegLines:null,
+    bestPlayoffLineup:null, bestPlayoffRegLines:null, bestPlayoffLines:null
   };
   var bstats = {
     bestGradeIdx:null, bestGradeText:null, bestPRA:null, bestSeasonWins:null, bestSeasonRecord:null, bestPlayoffRank:null, bestPlayoffText:null,
     bestPlayerSeasonScore:null, bestPlayerSeasonText:null,
     bestPlayoffPlayerScore:null, bestPlayoffPlayerText:null,
-    totalAwardsWon:0, bestAwardsSeasonCount:null, bestAwardsSeasonText:null
+    totalAwardsWon:0, bestAwardsSeasonCount:null, bestAwardsSeasonText:null,
+    bestGradeLineup:null,
+    bestSeasonLineup:null, bestSeasonRegLines:null,
+    bestPlayoffLineup:null, bestPlayoffRegLines:null, bestPlayoffLines:null
   };
   var PLAYOFF_RANK_LABELS = [
     "Missed the Playoffs", "Eliminated in the Play-In", "Lost in the First Round",
@@ -4911,30 +5159,39 @@
   function bballSaveStats(){
     try{ localStorage.setItem(BSTATS_KEY, JSON.stringify(bstats)); }catch(e){}
   }
-  function bballUpdateGradeStats(grade){
+  function bballUpdateGradeStats(grade, lineup){
     if (grade.estTotal == null) return;
     var idx = -1;
     for (var i=0;i<BBALL_GRADE_TIERS.length;i++){ if (BBALL_GRADE_TIERS[i].grade === grade.grade){ idx = i; break; } }
+    var improved = false;
     if (idx !== -1 && (bstats.bestGradeIdx === null || idx < bstats.bestGradeIdx)){
       bstats.bestGradeIdx = idx;
       bstats.bestGradeText = grade.grade + " — " + grade.label;
+      improved = true;
     }
     if (bstats.bestPRA === null || grade.estTotal > bstats.bestPRA){
       bstats.bestPRA = grade.estTotal;
+      improved = true;
     }
+    if (improved && lineup) bstats.bestGradeLineup = lineup;
     bballSaveStats();
   }
-  function bballUpdateSeasonStats(wins, losses){
+  function bballUpdateSeasonStats(wins, losses, lineup, regLines){
     if (bstats.bestSeasonWins === null || wins > bstats.bestSeasonWins){
       bstats.bestSeasonWins = wins;
       bstats.bestSeasonRecord = wins + "-" + losses;
+      if (lineup) bstats.bestSeasonLineup = lineup;
+      if (regLines) bstats.bestSeasonRegLines = regLines;
       bballSaveStats();
     }
   }
-  function bballUpdatePlayoffStats(rank){
+  function bballUpdatePlayoffStats(rank, lineup, regLines, playoffLines){
     if (bstats.bestPlayoffRank === null || rank > bstats.bestPlayoffRank){
       bstats.bestPlayoffRank = rank;
       bstats.bestPlayoffText = PLAYOFF_RANK_LABELS[rank];
+      if (lineup) bstats.bestPlayoffLineup = lineup;
+      if (regLines) bstats.bestPlayoffRegLines = regLines;
+      if (playoffLines) bstats.bestPlayoffLines = playoffLines;
       bballSaveStats();
     }
   }
@@ -4989,15 +5246,30 @@
     }
     var html = "";
     html += card("Best Grade", bstats.bestGradeText || "—", bstats.bestGradeText ? "Highest team grade drafted so far." : "Finish a draft to set your first record.");
+    html += bballRecordDropdownHtml("grade", bstats.bestGradeLineup, null, null);
     html += card("Best Overall P+R+A", bstats.bestPRA !== null ? bstats.bestPRA.toFixed(1) : "—", "Combined PPG+RPG+APG average across your five, ×5.");
     html += card("Best Season Sim", bstats.bestSeasonRecord || "—", "Best regular-season record across all simulated seasons.");
+    html += bballRecordDropdownHtml("season", bstats.bestSeasonLineup, bstats.bestSeasonRegLines, null);
     html += card("Best Playoff Result", bstats.bestPlayoffText || "—", "Furthest run through the postseason you've achieved.");
+    html += bballRecordDropdownHtml("playoff", bstats.bestPlayoffLineup, bstats.bestPlayoffRegLines, bstats.bestPlayoffLines);
     html += card("Best Individual Season", bstats.bestPlayerSeasonText || "—", "Best simulated regular-season line from any of your drafted players.");
     html += card("Best Individual Playoff Run", bstats.bestPlayoffPlayerText || "—", "Best simulated playoff line from any of your drafted players.");
     html += card("Total Awards Won", bstats.totalAwardsWon || 0, "Lifetime tally of MVP, Coach of the Year, and Finals MVP awards.");
     html += card("Best Awards Season", bstats.bestAwardsSeasonCount !== null ? (bstats.bestAwardsSeasonCount + " award" + (bstats.bestAwardsSeasonCount===1?"":"s")) : "—", bstats.bestAwardsSeasonText || "No awards won yet.");
     document.getElementById("bballStatsBody").innerHTML = html;
   }
+
+  document.getElementById("bballStatsBody").addEventListener("click", function(e){
+    var btn = e.target.closest(".bball-record-toggle .bball-record-tab");
+    if (!btn) return;
+    var wrap = btn.parentElement;
+    var key = wrap.getAttribute("data-record");
+    var view = btn.getAttribute("data-view");
+    wrap.querySelectorAll(".bball-record-tab").forEach(function(t){ t.classList.toggle("active", t === btn); });
+    document.querySelectorAll('.bball-record-lines[data-record="' + key + '"]').forEach(function(panel){
+      panel.style.display = panel.getAttribute("data-view") === view ? "block" : "none";
+    });
+  });
 
   document.getElementById("bballSimSeasonBtn").addEventListener("click", bballOpenSeason);
   document.getElementById("bballSeasonMenuBtn").addEventListener("click", openBballDraft);
